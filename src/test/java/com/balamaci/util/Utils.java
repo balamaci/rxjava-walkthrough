@@ -23,7 +23,7 @@ public class Utils {
 
     public static void wait(CountDownLatch waitOn) {
         try {
-            waitOn.wait();
+            waitOn.await();
         } catch (InterruptedException e) {
             log.error("Interrupted waiting on CountDownLatch");
             throw new RuntimeException("Interrupted thread");
