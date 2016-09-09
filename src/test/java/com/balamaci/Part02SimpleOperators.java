@@ -27,5 +27,17 @@ public class Part02SimpleOperators {
                         () -> log.info("Completed"));
     }
 
+    @Test
+    public void intervalOperator() {
+        Observable.interval(1, TimeUnit.SECONDS)
+                .take(5)
+                .toBlocking()
+                .subscribe(
+                        tick -> log.info("Tick {}", tick),
+                        (ex) -> log.info("Error emitted"),
+                        () -> log.info("Completed"));
+    }
+
+
 
 }
