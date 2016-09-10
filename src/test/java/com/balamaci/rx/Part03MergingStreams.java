@@ -3,6 +3,7 @@ package com.balamaci.rx;
 import com.balamaci.rx.util.Helpers;
 import org.junit.Test;
 import rx.Observable;
+import rx.observables.BlockingObservable;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -24,4 +25,28 @@ public class Part03MergingStreams implements BaseTestObservables {
 
         Helpers.wait(latch);
     }
+
+    @Test
+    public void mergingStreams() {
+        Observable<String> colors = periodicEmitter("red", "green", "blue", 2, TimeUnit.SECONDS);
+
+        Observable<Long> numbers = Observable.interval(1, TimeUnit.SECONDS)
+                .take(2);
+
+        BlockingObservable observable = Observable.merge(colors, numbers).toBlocking();
+        subscribeWithLog(observable);
+    }
+
+    @Test
+    public void concatStreams() {
+        Observable<String> colors = periodicEmitter("red", "green", "blue", 2, TimeUnit.SECONDS);
+
+        Observable<Long> numbers = Observable.interval(1, TimeUnit.SECONDS)
+                .take(4);
+
+        BlockingObservable observable = Observable.concat(colors, numbers).toBlocking();
+        subscribeWithLog(observable);
+    }
+
+
 }

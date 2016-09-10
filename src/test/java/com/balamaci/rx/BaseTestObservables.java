@@ -57,9 +57,14 @@ public interface BaseTestObservables {
         );
     }
 
-    default  <T> Observable<T> periodicEmitter(T t1, T t2, T t3) {
+    default  <T> Observable<T> periodicEmitter(T t1, T t2, T t3, int interval, TimeUnit unit) {
+        return periodicEmitter(t1, t2, t3, interval, unit, interval);
+    }
+
+    default  <T> Observable<T> periodicEmitter(T t1, T t2, T t3, int interval,
+                                               TimeUnit unit, int initialDelay) {
         Observable<T> colors = Observable.just(t1, t2, t3);
-        Observable<Long> timer = Observable.interval(2, TimeUnit.SECONDS);
+        Observable<Long> timer = Observable.interval(initialDelay, interval, unit);
 
         return Observable.zip(colors, timer, (key, val) -> key);
     }
