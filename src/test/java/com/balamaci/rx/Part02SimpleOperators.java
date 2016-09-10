@@ -1,4 +1,4 @@
-package com.balamaci;
+package com.balamaci.rx;
 
 import org.junit.Test;
 import org.slf4j.Logger;

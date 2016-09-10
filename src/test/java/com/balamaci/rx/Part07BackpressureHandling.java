@@ -1,6 +1,6 @@
-package com.balamaci;
+package com.balamaci.rx;
 
-import com.balamaci.util.Utils;
+import com.balamaci.rx.util.Helpers;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,9 +12,9 @@ import java.util.concurrent.CountDownLatch;
 /**
  * @author sbalamaci
  */
-public class Part06BackpressureHandling {
+public class Part07BackpressureHandling {
 
-    private static final Logger log = LoggerFactory.getLogger(Part06BackpressureHandling.class);
+    private static final Logger log = LoggerFactory.getLogger(Part07BackpressureHandling.class);
 
     @Test
     public void throwingBackpressureNotSupported() {
@@ -26,13 +26,13 @@ public class Part06BackpressureHandling {
                 .observeOn(Schedulers.io())
                 .subscribe(val -> {
                             log.info("Got {}", val);
-                            Utils.sleepMillis(50);
+                            Helpers.sleepMillis(50);
                         },
                         err -> {
                             log.error("Subscriber got error", err);
                             latch.countDown();
                         });
-        Utils.wait(latch);
+        Helpers.wait(latch);
     }
 
     @Test
@@ -45,7 +45,7 @@ public class Part06BackpressureHandling {
                 .observeOn(Schedulers.io())
                 .subscribe(val -> {
                             log.info("Got {}", val);
-                            Utils.sleepMillis(50);
+                            Helpers.sleepMillis(50);
                         },
                         err -> {
                             log.error("Subscriber got error", err);
@@ -55,7 +55,7 @@ public class Part06BackpressureHandling {
                             log.info("Completed");
                             latch.countDown();
                         });
-        Utils.wait(latch);
+        Helpers.wait(latch);
     }
 
     @Test
@@ -69,7 +69,7 @@ public class Part06BackpressureHandling {
                 .observeOn(Schedulers.io())
                 .subscribe(val -> {
                             log.info("Got {}", val);
-                            Utils.sleepMillis(50);
+                            Helpers.sleepMillis(50);
                         },
                         err -> {
                             log.error("Subscriber got error", err);
@@ -79,7 +79,7 @@ public class Part06BackpressureHandling {
                             log.info("Completed");
                             latch.countDown();
                         });
-        Utils.wait(latch);
+        Helpers.wait(latch);
     }
 
     private Observable<Integer> observableWithoutBackpressureSupport() {
@@ -93,6 +93,10 @@ public class Part06BackpressureHandling {
 
             subscriber.onCompleted();
         });
+    }
+
+    private void subscribeWithSlowSubscriber() {
+
     }
 
 }

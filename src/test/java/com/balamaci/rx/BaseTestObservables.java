@@ -1,12 +1,14 @@
-package com.balamaci;
+package com.balamaci.rx;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import rx.Observable;
 import rx.functions.Action0;
 import rx.functions.Action1;
+import rx.observables.BlockingObservable;
 
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author sbalamaci
@@ -29,6 +31,37 @@ public interface BaseTestObservables {
         });
 
         return observable;
+    }
+
+    default void subscribeWithLog(Observable observable) {
+        observable.subscribe(
+                val -> log.info("Subscriber received: {}", val),
+                logError(),
+                logComplete()
+        );
+    }
+
+    default void subscribeWithLog(Observable observable, CountDownLatch latch) {
+        observable.subscribe(
+                val -> log.info("Subscriber received: {}", val),
+                logError(latch),
+                logComplete(latch)
+        );
+    }
+
+    default void subscribeWithLog(BlockingObservable observable) {
+        observable.subscribe(
+                val -> log.info("Subscriber received: {}", val),
+                logError(),
+                logComplete()
+        );
+    }
+
+    default  <T> Observable<T> periodicEmitter(T t1, T t2, T t3) {
+        Observable<T> colors = Observable.just(t1, t2, t3);
+        Observable<Long> timer = Observable.interval(2, TimeUnit.SECONDS);
+
+        return Observable.zip(colors, timer, (key, val) -> key);
     }
 
     default Action1<Throwable> logError() {

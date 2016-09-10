@@ -1,4 +1,4 @@
-package com.balamaci.util;
+package com.balamaci.rx.util;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -8,9 +8,9 @@ import java.util.concurrent.CountDownLatch;
 /**
  * @author sbalamaci
  */
-public class Utils {
+public class Helpers {
 
-    private static final Logger log = LoggerFactory.getLogger(Utils.class);
+    private static final Logger log = LoggerFactory.getLogger(Helpers.class);
 
     public static void sleepMillis(int millis) {
         try {
