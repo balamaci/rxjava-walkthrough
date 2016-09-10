@@ -22,6 +22,14 @@ public class Part01CreateObservable implements BaseTestObservables {
     }
 
     @Test
+    public void range() {
+        Observable<Integer> observable = Observable.range(1,10);
+
+        observable.subscribe(
+                val -> log.info("Subscriber received: {}"));
+    }
+
+    @Test
     public void createSimpleObservable() {
         Observable<Integer> observable = simpleObservable();
 
