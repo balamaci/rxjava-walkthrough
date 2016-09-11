@@ -18,7 +18,7 @@ public class Part01CreateObservable implements BaseTestObservables {
         Observable<Integer> observable = Observable.just(1,5,10);
 
         observable.subscribe(
-                val -> log.info("Subscriber received: {}"));
+                val -> log.info("Subscriber received: {}", val));
     }
 
     @Test
@@ -34,11 +34,34 @@ public class Part01CreateObservable implements BaseTestObservables {
         Observable<Integer> observable = simpleObservable();
 
         observable.subscribe(
-                val -> log.info("Subscriber received: {}"),
+                val -> log.info("Subscriber received: {}", val),
                 err -> log.error("Subscriber received error", err),
                 () -> log.info("Subscriber got Completed event")
         );
     }
 
+    @Test
+    public void showUnsubscribeObservable() {
+        Observable<Integer> observable = Observable.create(subscriber -> {
+
+            int i = 1;
+            while(true) {
+                if(! subscriber.isUnsubscribed()) {
+                    subscriber.onNext(i++);
+                } else {
+                    break;
+                }
+            }
+
+            subscriber.onCompleted();
+        });
+
+        observable
+                .take(5)
+                .subscribe(val -> log.info("Subscriber received: {}", val),
+                err -> log.error("Subscriber received error", err),
+                () -> log.info("Subscriber got Completed event")
+        );
+    }
 
 }

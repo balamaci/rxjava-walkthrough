@@ -1,8 +1,10 @@
 package com.balamaci.rx;
 
+import javafx.util.Pair;
 import org.junit.Test;
 import rx.Observable;
 import rx.observables.BlockingObservable;
+import rx.observables.GroupedObservable;
 
 import java.util.concurrent.TimeUnit;
 
@@ -23,4 +25,19 @@ public class Part05AdvancedOperators implements BaseTestObservables {
         subscribeWithLog(delayedNumbersWindow);
     }
 
+    @Test
+    public void groupBy() {
+        Observable<String> numbers = Observable.from(new String[] { "red", "green", "blue",
+                "red", "yellow", "green", "green"});
+
+        Observable<GroupedObservable<String, String>> groupedColorsStream = numbers
+                .groupBy(val -> val);
+
+        Observable<Pair<String, Integer>> colorCountStream = groupedColorsStream
+                .flatMap(groupedColor -> groupedColor
+                            .count()
+                            .map(count -> new Pair<>(groupedColor.getKey(), count)));
+
+        subscribeWithLog(colorCountStream.toBlocking());
+    }
 }

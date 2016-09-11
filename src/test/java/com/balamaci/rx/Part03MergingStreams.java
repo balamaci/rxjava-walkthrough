@@ -14,6 +14,10 @@ import java.util.concurrent.TimeUnit;
 public class Part03MergingStreams implements BaseTestObservables {
 
     @Test
+    /**
+     * Zip operator operates sort of like a zipper in the sense that it takes
+     * an event from one
+     */
     public void zipUsedToSlowDown() {
         CountDownLatch latch = new CountDownLatch(1);
 
