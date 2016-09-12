@@ -103,6 +103,8 @@ public class Part07BackpressureHandling implements BaseTestObservables {
         Helpers.wait(latch);
     }
 
+    // Handling
+    //========================================================
 
     @Test
     public void dropOverflowingEvents() {

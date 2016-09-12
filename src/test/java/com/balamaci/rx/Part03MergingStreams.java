@@ -13,11 +13,13 @@ import java.util.concurrent.TimeUnit;
  */
 public class Part03MergingStreams implements BaseTestObservables {
 
-    @Test
     /**
      * Zip operator operates sort of like a zipper in the sense that it takes
-     * an event from one
+     * an event from one stream and waits for an event from the other stream. Once an event for the other stream
+     * arrives, it uses the zip function to merge the two events
+     *
      */
+    @Test
     public void zipUsedToSlowDown() {
         CountDownLatch latch = new CountDownLatch(1);
 
@@ -40,6 +42,7 @@ public class Part03MergingStreams implements BaseTestObservables {
         BlockingObservable observable = Observable.merge(colors, numbers).toBlocking();
         subscribeWithLog(observable);
     }
+
 
     @Test
     public void concatStreams() {

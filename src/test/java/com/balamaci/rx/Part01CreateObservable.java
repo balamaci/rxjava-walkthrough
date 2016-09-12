@@ -33,20 +33,6 @@ public class Part01CreateObservable implements BaseTestObservables {
     }
 
     @Test
-    public void fromFuture() {
-        CompletableFuture<String> completableFuture = CompletableFuture.supplyAsync(() -> { //starts a background task
-            log.info("CompletableFuture work starts");  //in the ForkJoin common pool
-            Helpers.sleepMillis(100);
-            return "red";
-        });
-
-        Observable<String> observable = Observable.from(completableFuture);
-
-        observable.subscribe(
-                val -> log.info("Subscriber received: {}", val));
-    }
-
-    @Test
     public void fromArray() {
         Observable<String> observable = Observable.from(new String[] {"red", "green", "blue", "black"});
 
@@ -55,10 +41,31 @@ public class Part01CreateObservable implements BaseTestObservables {
     }
 
     /**
-     * Using Observable.create to handle the actual emissions of events with the events like onNext, onCompleted
+     * We can also create an Observable from Future, making easier to switch from legacy code to reactive
+     */
+    @Test
+    public void fromFuture() {
+        CompletableFuture<String> completableFuture = CompletableFuture.supplyAsync(() -> { //starts a background task
+            log.info("CompletableFuture work starts");  //in the ForkJoin common pool
+            Helpers.sleepMillis(100);
+            return "red";
+        });
+
+        Observable<String> observable = Observable.from(completableFuture);
+        observable.subscribe(val -> log.info("Subscriber received: {}", val));
+
+
+        completableFuture = CompletableFuture.completedFuture("green");
+        observable = Observable.from(completableFuture);
+        observable.subscribe(val -> log.info("Subscriber2 received: {}", val));
+    }
+
+
+    /**
+     * Using Observable.create to handle the actual emissions of events with the events like onNext, onCompleted, onError
      *
-     * When using Observable.create you need to be aware of BackPressure and that Observables created with 'create'
-     * are not BackPressure aware
+     * When using Observable.create you need to be aware of BackPressure and that Observables based on 'create' method
+     * are not Backpressure aware {@see Part07BackpressureHandling}
      */
     @Test
     public void createSimpleObservable() {
@@ -81,8 +88,35 @@ public class Part01CreateObservable implements BaseTestObservables {
         );
     }
 
+
     /**
-     * Event if we sleep for a long time inside create method(to simulate a costly operation,
+     * Observable emits an Error event which is a terminal operation and the subscriber is no longer executing
+     * it's onNext callback. We're actually breaking the the Observable contract that we're still emitting events
+     * after onComplete or onError have fired.
+     */
+    @Test
+    public void createSimpleObservableThatEmitsError() {
+        Observable<Integer> observable = Observable.create(subscriber -> {
+            log.info("Started emitting");
+
+            log.info("Emitting 1st");
+            subscriber.onNext(1);
+
+            subscriber.onError(new RuntimeException("Test exception"));
+
+            log.info("Emitting 2nd");
+            subscriber.onNext(2);
+        });
+
+        observable.subscribe(
+                val -> log.info("Subscriber received: {}", val),
+                err -> log.error("Subscriber received error", err),
+                () -> log.info("Subscriber got Completed event")
+        );
+    }
+
+    /**
+     * Event if we sleep for a long time inside create method(to simulate a costly operation),
      * without subscribing to this Observable the code is not executed and the method returns immediately.
      */
     @Test
@@ -96,7 +130,7 @@ public class Part01CreateObservable implements BaseTestObservables {
 
     /**
      * Inside the create() method, we can check is there are still active subscribers to our Observable.
-     * It's a way to stop emissions
+     * It's a way to prevent to do extra work(like for ex. querying a datasource for entries) if no one is listening
      */
     @Test
     public void showUnsubscribeObservable() {
