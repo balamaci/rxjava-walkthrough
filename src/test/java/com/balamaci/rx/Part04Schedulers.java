@@ -14,17 +14,22 @@ import java.util.concurrent.CountDownLatch;
  * and will run the operations on the subscription thread.
  *
  * There are two methods through which we can introduce Schedulers into our chain of operations:
- * - <b>subscribeOn allows to specify which Scheduler invokes the code contained in the lambda code for Observable.create
+ * - <b>subscribeOn allows to specify which Scheduler invokes the code contained in the lambda code for Observable.create()
  * - <b>observeOn</b> allows control to which Scheduler executes the code in the downstream operators
  *
+ * RxJava provides some general use Schedulers already implemented:
+ *  - Schedulers.computation() - to be used for CPU intensive tasks. A threadpool
+ *  - Schedulers.io() - to be used for IO bound tasks
+ *  - Schedulers.from(Executor) - custom ExecutorService
  *
+ * Some operators must . By default they use Scheduler.computation()
  *
  * @author sbalamaci
  */
 public class Part04Schedulers implements BaseTestObservables {
 
     /**
-     * subscribeOn refers to the code.
+     * subscribeOn allows to specify which Scheduler invokes the code contained in the lambda code for Observable.create()
      */
     @Test
     public void testSubscribeOn() {

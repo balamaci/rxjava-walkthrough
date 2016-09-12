@@ -5,6 +5,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import rx.Observable;
+import rx.Subscription;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -64,8 +65,11 @@ public class Part01CreateObservable implements BaseTestObservables {
     /**
      * Using Observable.create to handle the actual emissions of events with the events like onNext, onCompleted, onError
      *
-     * When using Observable.create you need to be aware of BackPressure and that Observables based on 'create' method
-     * are not Backpressure aware {@see Part07BackpressureHandling}
+     * When subscribing to the Observable with observable.subscribe() the lambda code inside create() gets executed.
+     * Observable.subscribe can take 3 handlers for each type of event - onNext, onError and onCompleted
+     *
+     * When using Observable.create you need to be aware of **Backpressure** and that Observables based on 'create' method
+     * are not Backpressure aware {@see Part07BackpressureHandling}.
      */
     @Test
     public void createSimpleObservable() {
@@ -81,11 +85,10 @@ public class Part01CreateObservable implements BaseTestObservables {
             subscriber.onCompleted();
         });
 
-        observable.subscribe(
-                val -> log.info("Subscriber received: {}", val),
-                err -> log.error("Subscriber received error", err),
-                () -> log.info("Subscriber got Completed event")
-        );
+        Subscription subscription = observable.subscribe(
+                                                    val -> log.info("Subscriber received: {}", val),
+                                                    err -> log.error("Subscriber received error", err),
+                                                    () -> log.info("Subscriber got Completed event"));
     }
 
 
@@ -126,6 +129,7 @@ public class Part01CreateObservable implements BaseTestObservables {
             Helpers.sleepMillis(5000);
             subscriber.onNext(1);
         });
+        log.info("Finished");
     }
 
     /**
