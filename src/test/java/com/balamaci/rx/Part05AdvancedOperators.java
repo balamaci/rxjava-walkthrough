@@ -6,12 +6,36 @@ import rx.Observable;
 import rx.observables.BlockingObservable;
 import rx.observables.GroupedObservable;
 
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
  * @author sbalamaci
  */
 public class Part05AdvancedOperators implements BaseTestObservables {
+
+    @Test
+    public void buffer() {
+        Observable<Long> numbers = Observable.interval(1, TimeUnit.SECONDS);
+
+        BlockingObservable<List<Long>> delayedNumbersWindow = numbers
+                .buffer(5).toBlocking();
+
+        subscribeWithLog(delayedNumbersWindow);
+    }
+
+    @Test
+    public void simpleWindow() {
+        Observable<Long> numbers = Observable.interval(1, TimeUnit.SECONDS);
+
+        BlockingObservable<Long> delayedNumbersWindow = numbers
+                .window(5)
+                .flatMap(window -> window.doOnCompleted(() -> log.info("Window completed")))
+                .toBlocking();
+
+        subscribeWithLog(delayedNumbersWindow);
+    }
+
 
     @Test
     public void window() {
