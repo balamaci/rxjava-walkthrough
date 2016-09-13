@@ -20,12 +20,13 @@ import java.util.concurrent.CountDownLatch;
  * RxJava provides some general use Schedulers already implemented:
  *  - Schedulers.computation() - to be used for CPU intensive tasks. A threadpool
  *  - Schedulers.io() - to be used for IO bound tasks
- *
  *  - Schedulers.from(Executor) - custom ExecutorService
+ *  - Schedulers.newThread() - always creates a new thread when a worker is needed. Since it's not thread pooled
+ *  and always creates a new thread instead of reusing one, this scheduler is not very useful
  *
  * Although we said by default RxJava doesn't introduce concurrency, some operators that involve waiting like 'delay',
- * 'interval' need to run on a Scheduler(so by default Schedulers.computation() is used), otherwise they would just
- * block the subscribing thread by default. This default
+ * 'interval' need to run on a Scheduler, otherwise they would just block the subscribing thread.
+ * By default **Schedulers.computation()** is used, but the Scheduler can be passed as a parameter.
  *
  * @author sbalamaci
  */

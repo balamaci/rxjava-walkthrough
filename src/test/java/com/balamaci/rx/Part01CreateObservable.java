@@ -35,7 +35,7 @@ public class Part01CreateObservable implements BaseTestObservables {
 
     @Test
     public void fromArray() {
-        Observable<String> observable = Observable.from(new String[] {"red", "green", "blue", "black"});
+        Observable<String> observable = Observable.from(new String[]{"red", "green", "blue", "black"});
 
         observable.subscribe(
                 val -> log.info("Subscriber received: {}"));
@@ -46,11 +46,11 @@ public class Part01CreateObservable implements BaseTestObservables {
      */
     @Test
     public void fromFuture() {
-        CompletableFuture<String> completableFuture = CompletableFuture.supplyAsync(() -> { //starts a background task
-            log.info("CompletableFuture work starts");  //in the ForkJoin common pool
-            Helpers.sleepMillis(100);
-            return "red";
-        });
+        CompletableFuture<String> completableFuture = CompletableFuture.
+                supplyAsync(() -> { //starts a background thread the ForkJoin common pool
+                      Helpers.sleepMillis(100);
+                      return "red";
+                });
 
         Observable<String> observable = Observable.from(completableFuture);
         observable.subscribe(val -> log.info("Subscriber received: {}", val));
@@ -64,11 +64,11 @@ public class Part01CreateObservable implements BaseTestObservables {
 
     /**
      * Using Observable.create to handle the actual emissions of events with the events like onNext, onCompleted, onError
-     *
+     * <p>
      * When subscribing to the Observable with observable.subscribe() the lambda code inside create() gets executed.
      * Observable.subscribe can take 3 handlers for each type of event - onNext, onError and onCompleted
-     *
-     * When using Observable.create you need to be aware of **Backpressure** and that Observables based on 'create' method
+     * <p>
+     * When using Observable.create you need to be aware of <b>Backpressure</b> and that Observables based on 'create' method
      * are not Backpressure aware {@see Part07BackpressureHandling}.
      */
     @Test
@@ -85,10 +85,11 @@ public class Part01CreateObservable implements BaseTestObservables {
             subscriber.onCompleted();
         });
 
+        log.info("Subscribing");
         Subscription subscription = observable.subscribe(
-                                                    val -> log.info("Subscriber received: {}", val),
-                                                    err -> log.error("Subscriber received error", err),
-                                                    () -> log.info("Subscriber got Completed event"));
+                val -> log.info("Subscriber received: {}", val),
+                err -> log.error("Subscriber received error", err),
+                () -> log.info("Subscriber got Completed event"));
     }
 
 
@@ -119,13 +120,14 @@ public class Part01CreateObservable implements BaseTestObservables {
     }
 
     /**
-     * Event if we sleep for a long time inside create method(to simulate a costly operation),
+     * Observables are lazy meaning that the code inside create() doesn't get executed without subscribing to the Observable
+     * So event if we sleep for a long time inside create() method(to simulate a costly operation),
      * without subscribing to this Observable the code is not executed and the method returns immediately.
      */
     @Test
     public void observablesAreLazy() {
         Observable<Integer> observable = Observable.create(subscriber -> {
-            log.info("Started emitting but sleeping for 5 secs");
+            log.info("Started emitting but sleeping for 5 secs"); //this is not executed
             Helpers.sleepMillis(5000);
             subscriber.onNext(1);
         });
@@ -133,8 +135,39 @@ public class Part01CreateObservable implements BaseTestObservables {
     }
 
     /**
+     * When subscribing to an Observable, the create() method gets executed for each subscription
+     * this means that the events inside create are re-emitted to each subscriber. So every subscriber will get the
+     * same events and will not lose any events.
+     */
+    @Test
+    public void multipleSubscriptionsToSameObservable() {
+        Observable<Integer> observable = Observable.create(subscriber -> {
+            log.info("Started emitting");
+
+            log.info("Emitting 1st event");
+            subscriber.onNext(1);
+
+            log.info("Emitting 2nd event");
+            subscriber.onNext(2);
+
+            subscriber.onCompleted();
+        });
+
+        log.info("Subscribing 1st subscriber");
+        observable.subscribe(val -> log.info("First Subscriber received: {}", val));
+
+        log.info("=======================");
+
+        log.info("Subscribing 2nd subscriber");
+        observable.subscribe(val -> log.info("Second Subscriber received: {}", val));
+    }
+
+    /**
      * Inside the create() method, we can check is there are still active subscribers to our Observable.
      * It's a way to prevent to do extra work(like for ex. querying a datasource for entries) if no one is listening
+     * In the following example we'd expect to have an infinite stream, but because we stop if there are no active
+     * subscribers we stop producing events.
+     * The **take()** operator unsubscribes from the Observable after it's received the specified amount of events
      */
     @Test
     public void showUnsubscribeObservable() {
@@ -142,13 +175,13 @@ public class Part01CreateObservable implements BaseTestObservables {
 
             int i = 1;
             while(true) {
-                if(! subscriber.isUnsubscribed()) {
-                    subscriber.onNext(i++);
-                } else {
+                if(subscriber.isUnsubscribed()) {
                     break;
                 }
+
+                subscriber.onNext(i++);
             }
-            //subscriber.onCompleted(); to late to emit Complete event since subscriber already unsubscribed
+            //subscriber.onCompleted(); too late to emit Complete event since subscriber already unsubscribed
         });
 
         observable
@@ -161,5 +194,7 @@ public class Part01CreateObservable implements BaseTestObservables {
     }
 
 
+//    @Test
+//    public
 
 }
