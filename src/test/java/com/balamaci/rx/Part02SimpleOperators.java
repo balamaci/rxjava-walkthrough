@@ -18,7 +18,12 @@ public class Part02SimpleOperators {
      * Delay operator - the Thread.sleep of the reactive world, it's pausing for a particular increment of time
      * before emitting the whole range events which are thus shifted by the specified time amount.
      *
-     * {@see }
+     * The delay operator uses a Scheduler {@see Part04Schedulers} by default, which actually means it's
+     * running the operators and the subscribe operations on a different thread, which means the test method
+     * will terminate before we see the text from the log.
+     *
+     * To prevent this we use the .toBlocking() operator which returns a BlockingObservable. Operators on
+     * BlockingObservable block(wait) until upstream Observable is completed
      */
     @Test
     public void delayOperator() {
@@ -35,11 +40,13 @@ public class Part02SimpleOperators {
     }
 
     /**
-     * Timer operator waits for a specific amount of time before it emits an event and then completes
+     * Periodically emits a number starting from 0 and then increasing the value on each emission
      */
     @Test
-    public void timerOperator() {
-        Observable.timer(5, TimeUnit.SECONDS)
+    public void intervalOperator() {
+        log.info("Starting");
+        Observable.interval(1, TimeUnit.SECONDS)
+                .take(5)
                 .toBlocking()
                 .subscribe(
                         tick -> log.info("Tick {}", tick),
@@ -48,12 +55,12 @@ public class Part02SimpleOperators {
     }
 
     /**
-     * Periodically emits a number starting from 0 and then increasing the value on each emission
+     * Timer operator waits for a specific amount of time before it emits an event and then completes
      */
     @Test
-    public void intervalOperator() {
-        Observable.interval(1, TimeUnit.SECONDS)
-                .take(5)
+    public void timerOperator() {
+        log.info("Starting");
+        Observable.timer(5, TimeUnit.SECONDS)
                 .toBlocking()
                 .subscribe(
                         tick -> log.info("Tick {}", tick),

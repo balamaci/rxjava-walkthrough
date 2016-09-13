@@ -51,17 +51,33 @@ public class Part05AdvancedOperators implements BaseTestObservables {
 
     @Test
     public void groupBy() {
-        Observable<String> numbers = Observable.from(new String[] { "red", "green", "blue",
+        Observable<String> colors = Observable.from(new String[]{"red", "green", "blue",
                 "red", "yellow", "green", "green"});
 
-        Observable<GroupedObservable<String, String>> groupedColorsStream = numbers
+        Observable<GroupedObservable<String, String>> groupedColorsStream = colors
                 .groupBy(val -> val);
 
         Observable<Pair<String, Integer>> colorCountStream = groupedColorsStream
                 .flatMap(groupedColor -> groupedColor
-                            .count()
-                            .map(count -> new Pair<>(groupedColor.getKey(), count)));
+                        .count()
+                        .map(count -> new Pair<>(groupedColor.getKey(), count)));
 
         subscribeWithLog(colorCountStream.toBlocking());
+    }
+
+    @Test
+    public void bufferWithLimitTriggeredByObservable() {
+        Observable<String> colors = Observable.from(new String[]{"red", "green", "blue",
+                "red", "yellow", "#", "green", "green"});
+
+
+        colors.publish(p -> p.filter(val -> ! val.equals("#"))
+                             .buffer(() -> p.filter(val -> val.equals("#")))
+                )
+                .toBlocking()
+                .subscribe(list -> {
+            String listCommaSeparated = String.join(",", list);
+            log.info("List {}", listCommaSeparated);
+        });
     }
 }
