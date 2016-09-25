@@ -10,7 +10,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * @author sbalamaci
  */
-public class Part02SimpleOperators {
+public class Part02SimpleOperators implements BaseTestObservables {
 
     private static final Logger log = LoggerFactory.getLogger(Part02SimpleOperators.class);
 
@@ -18,7 +18,7 @@ public class Part02SimpleOperators {
      * Delay operator - the Thread.sleep of the reactive world, it's pausing for a particular increment of time
      * before emitting the whole range events which are thus shifted by the specified time amount.
      *
-     * The delay operator uses a Scheduler {@see Part04Schedulers} by default, which actually means it's
+     * The delay operator uses a Scheduler {@see Part07Schedulers} by default, which actually means it's
      * running the operators and the subscribe operations on a different thread, which means the test method
      * will terminate before we see the text from the log.
      *
@@ -35,8 +35,19 @@ public class Part02SimpleOperators {
                         (ex) -> log.info("Error emitted"),
                         () -> log.info("Completed"));
 
-
 //        Helpers.sleepMillis(10000);
+    }
+
+
+    @Test
+    public void delayOperatorWithVariableDelay() {
+        Observable.range(0, 5)
+                .delay(val -> Observable.timer(val * 10, TimeUnit.SECONDS))
+                .toBlocking()
+                .subscribe(
+                        tick -> log.info("Tick {}", tick),
+                        (ex) -> log.info("Error emitted"),
+                        () -> log.info("Completed"));
     }
 
     /**

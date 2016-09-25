@@ -30,7 +30,7 @@ import java.util.concurrent.CountDownLatch;
  *
  * @author sbalamaci
  */
-public class Part04Schedulers implements BaseTestObservables {
+public class Part07Schedulers implements BaseTestObservables {
 
     /**
      * subscribeOn allows to specify which Scheduler invokes the code contained in the lambda code for Observable.create()

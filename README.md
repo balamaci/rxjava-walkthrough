@@ -302,3 +302,16 @@ RxJava provides some general use Schedulers:
 Although we said by default RxJava doesn't introduce concurrency, lots of operators involve waiting like **delay**,
 **interval**, **zip** need to run on a Scheduler, otherwise they would just block the subscribing thread. 
 By default **Schedulers.computation()** is used, but the Scheduler can be passed as a parameter.
+
+
+### Flatmap operator
+The flatMap operator is so important and has so many different uses it deserves it's own category to explain it.
+
+I like to think of it as a sort of **fork-join** operation because what flatMap does is it takes individual stream items
+and maps each of them to an Observable(so it creates new Streams from each object) and then 'flattens' the events from 
+these Streams back into a single Stream.
+
+Why this looks like fork-join because for each element you can fork some jobs that keeps emitting results,
+and these results are emitted back as elements to the subscribers downstream
+ 
+**RuleOfThumb 1**: when you have an 'item' and you need Observable<X> you need flatMap

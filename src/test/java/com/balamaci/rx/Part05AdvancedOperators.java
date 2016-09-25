@@ -59,8 +59,9 @@ public class Part05AdvancedOperators implements BaseTestObservables {
 
         Observable<Pair<String, Integer>> colorCountStream = groupedColorsStream
                 .flatMap(groupedColor -> groupedColor
-                        .count()
-                        .map(count -> new Pair<>(groupedColor.getKey(), count)));
+                                            .count()
+                                            .map(count -> new Pair<>(groupedColor.getKey(), count))
+                );
 
         subscribeWithLog(colorCountStream.toBlocking());
     }

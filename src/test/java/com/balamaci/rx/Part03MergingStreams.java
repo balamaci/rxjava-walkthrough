@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * Operators for working with multiple streams
  *
- * @author sbalamaci
+ *
  */
 public class Part03MergingStreams implements BaseTestObservables {
 
@@ -21,26 +21,25 @@ public class Part03MergingStreams implements BaseTestObservables {
      * Zip operator operates sort of like a zipper in the sense that it takes an event from one stream and waits
      * for an event from another other stream. Once an event for the other stream arrives, it uses the zip function
      * to merge the two events.
-     *
+     * <p>
      * This is an useful scenario when for example you want to make requests to remote services in parallel and
      * wait for both responses before continuing.
-     *
+     * <p>
      * Zip operator besides the streams to zip, also takes as parameter a function which will produce the
      * combined result of the zipped streams once each stream emitted it's value
-     *
      */
     @Test
     public void zipUsedForTakingTheResultOfCombinedAsyncOperations() {
         CountDownLatch latch = new CountDownLatch(1);
 
         Observable<Boolean> isUserBlockedStream = Observable.from(CompletableFuture.supplyAsync(() -> {
-                    Helpers.sleepMillis(200);
-                    return Boolean.FALSE;
-                }));
+            Helpers.sleepMillis(200);
+            return Boolean.FALSE;
+        }));
         Observable<Integer> userCreditScoreStream = Observable.from(CompletableFuture.supplyAsync(() -> {
-                    Helpers.sleepMillis(2300);
-                    return 200;
-                }));
+            Helpers.sleepMillis(2300);
+            return 200;
+        }));
 
         Observable<Pair<Boolean, Integer>> userCheckStream = Observable.zip(isUserBlockedStream, userCreditScoreStream,
                 (blocked, creditScore) -> new Pair<Boolean, Integer>(blocked, creditScore));
@@ -71,7 +70,7 @@ public class Part03MergingStreams implements BaseTestObservables {
     /**
      * Merge operator combines one or more stream and passes events downstream as soon
      * as they appear
-     *
+     * <p>
      * The subscriber will receive both color strings and numbers from the Observable.interval
      * as soon as they are emitted
      */
@@ -108,5 +107,22 @@ public class Part03MergingStreams implements BaseTestObservables {
         subscribeWithLog(observable);
     }
 
+    /**
+     * combineLatest pairs events from multiple streams, but instead of waiting for an event
+     * from all other streams, it uses the last emitted event from that stream
+     */
+    @Test
+    public void combineLatest() {
+        CountDownLatch latch = new CountDownLatch(1);
 
+        log.info("Starting");
+
+        Observable<String> colors = periodicEmitter("red", "green", "blue", 3, TimeUnit.SECONDS);
+        Observable<Long> numbers = Observable.interval(1, TimeUnit.SECONDS)
+                .take(4);
+        Observable observable = Observable.combineLatest(colors, numbers, Pair::new);
+        subscribeWithLog(observable, latch);
+
+        Helpers.wait(latch);
+    }
 }

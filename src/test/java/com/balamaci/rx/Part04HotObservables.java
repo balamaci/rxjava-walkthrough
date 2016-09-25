@@ -3,8 +3,5 @@ package com.balamaci.rx;
 /**
  * @author sbalamaci
  */
-public class Part06ErrorHandling {
-
-
-
+public class Part04HotObservables {
 }

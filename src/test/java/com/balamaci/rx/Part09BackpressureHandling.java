@@ -14,9 +14,9 @@ import java.util.concurrent.TimeUnit;
 /**
  * @author sbalamaci
  */
-public class Part07BackpressureHandling implements BaseTestObservables {
+public class Part09BackpressureHandling implements BaseTestObservables {
 
-    private static final Logger log = LoggerFactory.getLogger(Part07BackpressureHandling.class);
+    private static final Logger log = LoggerFactory.getLogger(Part09BackpressureHandling.class);
 
     @Test
     public void throwingBackpressureNotSupported() {
