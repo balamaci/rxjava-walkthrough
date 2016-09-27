@@ -1,8 +1,10 @@
 package com.balamaci.rx;
 
 import com.balamaci.rx.util.Helpers;
+import javafx.util.Pair;
 import org.junit.Test;
 import rx.Observable;
+import rx.observables.GroupedObservable;
 import rx.schedulers.Schedulers;
 
 import java.util.concurrent.CountDownLatch;
@@ -15,8 +17,9 @@ import java.util.concurrent.CountDownLatch;
  * Why this looks like fork-join because for each element you can fork some async jobs that emitting events before completing,
  * and these results are emitted back as elements to the subscribers downstream
  *
- * RuleOfThumb 1: when you have an 'item' and you need Observable<Item> you need flatMap
- *
+ * RuleOfThumb 1: When you have an 'item' as parameter and you need to invoke something that returns an
+ *                    Observable<T> instead of <T>, you need flatMap
+ * RuleOfThumb 2: When you have Observable<Observable<T>> you probably need flatMap.
  *
  * @author sbalamaci
  */
@@ -33,8 +36,25 @@ public class Part06FlatMapOperator implements BaseTestObservables {
         CountDownLatch latch = new CountDownLatch(1);
 
         Observable<String> colors = Observable.just("orange", "red", "green", "blue")
-                .subscribeOn(Schedulers.io())
-                .flatMap(val -> simulateRemoteOperation(val));
+                .flatMap(colorName -> simulateRemoteOperation(colorName));
+        subscribeWithLog(colors, latch);
+
+        Helpers.wait(latch);
+    }
+
+    /**
+     *
+     */
+    @Test
+    public void flatMapSubstreamOperations() {
+        CountDownLatch latch = new CountDownLatch(1);
+
+        Observable<String> colors = Observable.just("orange", "red", "green", "blue");
+
+        Observable<Pair<String, Integer>> colorsCounted = colors
+                .flatMap(colorName -> simulateRemoteOperation(colorName)
+                                .count()
+                                .map(counter -> new Pair<>(colorName, counter)));
         subscribeWithLog(colors, latch);
 
         Helpers.wait(latch);
@@ -43,8 +63,8 @@ public class Part06FlatMapOperator implements BaseTestObservables {
 
     /**
      * Controlling the level of concurrency of the substreams.
-     * Only the first two substreams(the Observables returned by simulateRemoteOperation) are subscribed. As soon
-     * as one of them completes, another is subscribed.
+     * In the ex. below, only the first two substreams(the Observables returned by simulateRemoteOperation)
+     * are subscribed. As soon as one of them completes, another substream is subscribed.
      *
      */
     @Test
@@ -52,7 +72,6 @@ public class Part06FlatMapOperator implements BaseTestObservables {
         CountDownLatch latch = new CountDownLatch(1);
 
         Observable<String> colors = Observable.just("orange", "red", "green", "blue")
-                .subscribeOn(Schedulers.io())
                 .flatMap(val -> simulateRemoteOperation(val), 1);
         subscribeWithLog(colors, latch);
 
@@ -78,6 +97,23 @@ public class Part06FlatMapOperator implements BaseTestObservables {
         Helpers.wait(latch);
     }
 
+    /**
+     * When you have a Stream of Streams(Observable<Observable<T>>)
+     */
+    public void flatMapFor() {
+        CountDownLatch latch = new CountDownLatch(1);
+
+        Observable<String> colors = Observable.from(new String[]{"red", "green", "blue",
+                "red", "yellow", "green", "green"});
+
+        Observable<GroupedObservable<String, String>> groupedColorsStream = colors
+                                                                                .groupBy(val -> val);
+        groupedColorsStream.flatMap(groupedObservable
+                                        -> groupedObservable
+                                                .count()
+                                                .map(countVal -> new Pair<>(groupedObservable.getKey(), countVal))
+                            );
+    }
 
 
     private Observable<String> simulateRemoteOperation(String color) {
