@@ -12,23 +12,28 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 /**
+ * Backpressure is related to preventing overloading the subscriber with too many events.
+ * It can be the case of a slow consumer that cannot keep up.
+ * Backpressure relates to a feedback mechanism through which the subscriber can signal
+ * to the producer how much data it can consume.
+ * However the producer must be 'backpressure-aware' in order to know how to throttle back.
+ *
  * @author sbalamaci
  */
 public class Part09BackpressureHandling implements BaseTestObservables {
 
     private static final Logger log = LoggerFactory.getLogger(Part09BackpressureHandling.class);
 
+    /**
+     * Not being backpressure aware
+     */
     @Test
     public void throwingBackpressureNotSupported() {
-        CountDownLatch latch = new CountDownLatch(1);
-
         Observable<Integer> observable = observableWithoutBackpressureSupport();
 
         observable = observable
                 .observeOn(Schedulers.io());
-        subscribeWithSlowSubscriber(observable, latch);
-
-        Helpers.wait(latch);
+        subscribeWithSlowSubscriberAndWait(observable);
     }
 
     /**
@@ -36,8 +41,6 @@ public class Part09BackpressureHandling implements BaseTestObservables {
      */
     @Test
     public void throwingBackpressureNotSupportedSlowOperator() {
-        CountDownLatch latch = new CountDownLatch(1);
-
         Observable<Integer> observable = observableWithoutBackpressureSupport();
 
         observable = observable
@@ -47,9 +50,7 @@ public class Part09BackpressureHandling implements BaseTestObservables {
                     return val * 2;
                 });
 
-        subscribeWithLog(observable, latch);
-
-        Helpers.wait(latch);
+        subscribeWithLog(observable);
     }
 
     /**
@@ -65,7 +66,7 @@ public class Part09BackpressureHandling implements BaseTestObservables {
                 .observeOn(Schedulers.io());
         subscribeWithSlowSubscriber(observable, latch);
 
-        for(int i=0; i < 200; i++) {
+        for (int i = 0; i < 200; i++) {
             log.info("Emitting {}", i);
             subject.onNext(i);
         }
@@ -78,29 +79,23 @@ public class Part09BackpressureHandling implements BaseTestObservables {
      */
     @Test
     public void zipOperatorHasALimit() {
-        CountDownLatch latch = new CountDownLatch(1);
-
         Observable<Integer> fast = observableWithoutBackpressureSupport();
         Observable<Long> slowStream = Observable.interval(100, TimeUnit.MILLISECONDS);
 
         Observable<String> observable = Observable.zip(fast, slowStream,
                 (val1, val2) -> val1 + " " + val2);
 
-        subscribeWithLog(observable, latch);
-        Helpers.wait(latch);
+        subscribeWithSlowSubscriberAndWait(observable);
     }
 
     @Test
     public void backpressureAwareObservable() {
-        CountDownLatch latch = new CountDownLatch(1);
-
         Observable<Integer> observable = Observable.range(0, 200);
 
         observable = observable
                 .observeOn(Schedulers.io());
 
-        subscribeWithSlowSubscriber(observable, latch);
-        Helpers.wait(latch);
+        subscribeWithSlowSubscriberAndWait(observable);
     }
 
     // Handling
@@ -108,25 +103,20 @@ public class Part09BackpressureHandling implements BaseTestObservables {
 
     @Test
     public void dropOverflowingEvents() {
-        CountDownLatch latch = new CountDownLatch(1);
-
         Observable<Integer> observable = observableWithoutBackpressureSupport();
 
         observable = observable
                 .onBackpressureDrop(val -> log.info("Dropped {}", val))
                 .observeOn(Schedulers.io());
-        subscribeWithSlowSubscriber(observable, latch);
-
-        Helpers.wait(latch);
+        subscribeWithSlowSubscriberAndWait(observable);
     }
-
 
 
     private Observable<Integer> observableWithoutBackpressureSupport() {
         return Observable.create(subscriber -> {
             log.info("Started emitting");
 
-            for(int i=0; i < 200; i++) {
+            for (int i = 0; i < 200; i++) {
                 log.info("Emitting {}", i);
                 subscriber.onNext(i);
             }
@@ -135,13 +125,33 @@ public class Part09BackpressureHandling implements BaseTestObservables {
         });
     }
 
-    private void subscribeWithSlowSubscriber(Observable observable, CountDownLatch latch ) {
+
+    private void subscribeWithSlowSubscriberAndWait(Observable observable) {
+        CountDownLatch latch = new CountDownLatch(1);
+
         observable.subscribe(val -> {
                     log.info("Got {}", val);
                     Helpers.sleepMillis(50);
                 },
                 err -> {
                     log.error("Subscriber got error", err);
+                    latch.countDown();
+                },
+                () -> {
+                    log.info("Completed");
+                    latch.countDown();
+                });
+
+        Helpers.wait(latch);
+    }
+
+    private void subscribeWithSlowSubscriber(Observable observable, CountDownLatch latch) {
+        observable.subscribe(val -> {
+                    log.info("Got {}", val);
+                    Helpers.sleepMillis(50);
+                },
+                err -> {
+                    log.error("Subscriber got error", (Throwable) err);
                     latch.countDown();
                 },
                 () -> {

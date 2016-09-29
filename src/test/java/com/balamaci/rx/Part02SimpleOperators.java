@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import rx.Observable;
 
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -38,11 +39,21 @@ public class Part02SimpleOperators implements BaseTestObservables {
 //        Helpers.sleepMillis(10000);
     }
 
+    /**
+     * Timer operator waits for a specific amount of time before it emits an event and then completes
+     */
+    @Test
+    public void timerOperator() {
+        log.info("Starting");
+        Observable observable = Observable.timer(5, TimeUnit.SECONDS);
+        subscribeWithLogWaiting(observable);
+    }
+
 
     @Test
     public void delayOperatorWithVariableDelay() {
         Observable.range(0, 5)
-                .delay(val -> Observable.timer(val * 10, TimeUnit.SECONDS))
+                .delay(val -> Observable.timer(val * 2, TimeUnit.SECONDS))
                 .toBlocking()
                 .subscribe(
                         tick -> log.info("Tick {}", tick),
@@ -66,19 +77,17 @@ public class Part02SimpleOperators implements BaseTestObservables {
     }
 
     /**
-     * Timer operator waits for a specific amount of time before it emits an event and then completes
+     * repeat resubscribes to the observable after it receives onComplete
      */
     @Test
-    public void timerOperator() {
-        log.info("Starting");
-        Observable.timer(5, TimeUnit.SECONDS)
-                .toBlocking()
-                .subscribe(
-                        tick -> log.info("Tick {}", tick),
-                        (ex) -> log.info("Error emitted"),
-                        () -> log.info("Completed"));
+    public void repeat() {
+        Observable random = Observable.defer(() -> {
+                                Random rand = new Random();
+                                return Observable.just(rand.nextInt(20));
+                            })
+                            .repeat(5);
+
+        subscribeWithLogWaiting(random);
     }
-
-
 
 }

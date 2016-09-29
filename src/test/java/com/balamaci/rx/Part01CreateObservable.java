@@ -194,7 +194,23 @@ public class Part01CreateObservable implements BaseTestObservables {
     }
 
 
-//    @Test
-//    public
+    /**
+     * defer acts as a factory of Observables, just when subscribed it actually invokes the logic
+     * to create the Observable to be emitted
+     */
+    @Test
+    public void deferCreateObservable() {
+        log.info("Starting");
+        Observable<Long> observable = Observable.defer(() -> {
+            log.info("Computing");
+            long value = System.currentTimeMillis();
+            return Observable.just(value);
+        });
+
+        log.info("Sleeping");
+        Helpers.sleepMillis(2000);
+
+        subscribeWithLog(observable);
+    }
 
 }

@@ -5,7 +5,9 @@
    - [Observable](#observable)
    - [Simple Operators](#simple-operators)
    - [Merging Streams](#merging-streams)
+   - [FlatMap Operator](#flatmap-operator)
    - [Schedulers](#schedulers)
+   - [Error Handling](#error-handling)
 
 
 ## Observable
@@ -152,7 +154,11 @@ observable
 
 ```
 
+### defer
+
+
 ## Simple Operators
+Code is available at [Part02SimpleOperators.java](https://github.com/balamaci/rxjava-playground/blob/master/src/test/java/com/balamaci/rx/Part02SimpleOperators.java)
 
 ### interval
 Periodically emits a number starting from 0 and then increasing the value on each emission.
@@ -180,8 +186,11 @@ will terminate before we see the text from the log.
 To prevent this we use the **.toBlocking()** operator which returns a **BlockingObservable**. Operators on
 **BlockingObservable** block(wait) until upstream Observable is completed
 
+
+
 ## Merging Streams
 Operators for working with multiple streams
+Code at [Part03MergingStreams.java](https://github.com/balamaci/rxjava-playground/blob/master/src/test/java/com/balamaci/rx/Part03MergingStreams.java)
 
 ### zip
 Zip operator operates sort of like a zipper in the sense that it takes an event from one stream and waits
@@ -218,17 +227,17 @@ Even if the 'isUserBlockedStream' finishes after 200ms, 'userCreditScoreStream' 
 the 'zip' method applies the combining function(new Pair(x,y)) after it received both values and passes it 
 to the subscriber.
 
-Another good example of 'zip' is to slow down basically implementing a periodic emitter of events:
+Another good example of 'zip' is to slow down a stream by another basically **implementing a periodic emitter of events**:
 ```  
 Observable<String> colors = Observable.just("red", "green", "blue");
 Observable<Long> timer = Observable.interval(2, TimeUnit.SECONDS);
 
 Observable<String> periodicEmitter = Observable.zip(colors, timer, (key, val) -> key);
 ```
-Since the zip operator need a pair of events, the slow stream will work like a timer by periodically emitting 
+Since the zip operator needs a pair of events, the slow stream will work like a timer by periodically emitting 
 with zip setting the pace of emissions downstream every 2 seconds.
 
-Zip is also not limited to just two streams, it can merge 2,3,4,.. streams and group the 2,3,4 'pairs' of events.
+**Zip is not limited to just two streams**, it can merge 2,3,4,.. streams and wait for groups of 2,3,4 'pairs' of events which it combines with the zip function and sends downstream.
 
 ### merge
 Merge operator combines one or more stream and passes events downstream as soon as they appear.
@@ -280,7 +289,7 @@ Should the second stream be a 'hot' emitter, its events would be lost until the 
 and the seconds stream is subscribed.
 
 
-### Schedulers
+## Schedulers
 RxJava provides some high level concepts for concurrent execution, like ExecutorService we're not dealing
 with the low level constructs like creating the Threads ourselves. Instead we're using a **Scheduler** which create
 Workers who are responsible for scheduling and running code. By default RxJava will not introduce concurrency 
@@ -304,14 +313,375 @@ Although we said by default RxJava doesn't introduce concurrency, lots of operat
 By default **Schedulers.computation()** is used, but the Scheduler can be passed as a parameter.
 
 
-### Flatmap operator
+## Flatmap operator
 The flatMap operator is so important and has so many different uses it deserves it's own category to explain it.
+Code at [Part06FlatMapOperator.java](https://github.com/balamaci/rxjava-playground/blob/master/src/test/java/com/balamaci/rx/Part06FlatMapOperator.java)
 
 I like to think of it as a sort of **fork-join** operation because what flatMap does is it takes individual stream items
 and maps each of them to an Observable(so it creates new Streams from each object) and then 'flattens' the events from 
-these Streams back into a single Stream.
+these Streams back as coming from a single stream.
 
 Why this looks like fork-join because for each element you can fork some jobs that keeps emitting results,
 and these results are emitted back as elements to the subscribers downstream
+
+Rules of thumb to consider before getting comfortable with flatMap: 
+   
+   - When you have an 'item' and you'll get Observable&lt;X&gt;, instead of X, you need flatMap. Most common example is when you want 
+   to make a remote call that returns an Observable. For ex if you have a stream of customerIds, and downstream you
+    want to work with actual Customer objects:
+   ```   
+   Observable<Customer> getCustomer(Integer customerId) {..}
+    ...
+   
+   Observable<Integer> customerIds = Observable.of(1,2,3,4);
+   Observable<Customer> customers = customerIds
+                                        .flatMap(customerId -> getCustomer(customerId));
+   ```
+   
+   - When you have Observable&lt;Observable&lt;T&gt;&gt; you probably need flatMap.
+
+We use a simulated remote call that might return asynchronous as many events as the length of the color string
+```
+    private Observable<String> simulateRemoteOperation(String color) {
+        return Observable.<String>create(subscriber -> {
+                    Runnable asyncRun = () -> {
+                        for (int i = 0; i < color.length(); i++) {
+                            subscriber.onNext(color + i);
+                            Helpers.sleepMillis(200);
+                        }
+        
+                        subscriber.onCompleted();
+                    };
+                    new Thread(asyncRun).start();
+                });
+    }
+```
+
+If we have a stream of color names:
+```
+Observable<String> colors = Observable.just("orange", "red", "green")
+```
+to invoke the remote operation: 
+```
+Observable<String> colors = Observable.just("orange", "red", "green")
+         .flatMap(colorName -> simulateRemoteOperation(colorName));
+
+colors.subscribe(val -> log.info("Subscriber received: {}", val));         
+```
+returns
+```
+16:44:15 [Thread-0]- Subscriber received: orange0
+16:44:15 [Thread-2]- Subscriber received: green0
+16:44:15 [Thread-1]- Subscriber received: red0
+16:44:15 [Thread-0]- Subscriber received: orange1
+16:44:15 [Thread-2]- Subscriber received: green1
+16:44:15 [Thread-1]- Subscriber received: red1
+16:44:15 [Thread-0]- Subscriber received: orange2
+16:44:15 [Thread-2]- Subscriber received: green2
+16:44:15 [Thread-1]- Subscriber received: red2
+16:44:15 [Thread-0]- Subscriber received: orange3
+16:44:15 [Thread-2]- Subscriber received: green3
+16:44:16 [Thread-0]- Subscriber received: orange4
+16:44:16 [Thread-2]- Subscriber received: green4
+16:44:16 [Thread-0]- Subscriber received: orange5
+```
+
+Notice how the results are coming intertwined. This is because flatMap actually subscribes to it's inner Observables 
+returned from 'simulateRemoteOperation'. You can specify the concurrency level of flatMap as a parameter. Meaning 
+you can say how many of the substreams should be subscribed "concurrently" - aka before the onComplete 
+event is triggered on the substreams.
+By setting the concurrency to **1** we don't subscribe to other substreams until the current one finishes:
+```
+Observable<String> colors = Observable.just("orange", "red", "green")
+                     .flatMap(val -> simulateRemoteOperation(val), 1); //
+
+```
+Notice now there is a sequence from each color before the next one appears
+```
+17:15:24 [Thread-0]- Subscriber received: orange0
+17:15:24 [Thread-0]- Subscriber received: orange1
+17:15:25 [Thread-0]- Subscriber received: orange2
+17:15:25 [Thread-0]- Subscriber received: orange3
+17:15:25 [Thread-0]- Subscriber received: orange4
+17:15:25 [Thread-0]- Subscriber received: orange5
+17:15:25 [Thread-1]- Subscriber received: red0
+17:15:26 [Thread-1]- Subscriber received: red1
+17:15:26 [Thread-1]- Subscriber received: red2
+17:15:26 [Thread-2]- Subscriber received: green0
+17:15:26 [Thread-2]- Subscriber received: green1
+17:15:26 [Thread-2]- Subscriber received: green2
+17:15:27 [Thread-2]- Subscriber received: green3
+17:15:27 [Thread-2]- Subscriber received: green4
+```
+
+There is actually an operator which is basically this flatMap with 1 concurrency called **concatMap**.
+
+
+Inside the flatMap we can operate on the substream with the same stream operators
+```
+Observable<Pair<String, Integer>> colorsCounted = colors
+    .flatMap(colorName -> {
+               Observable<Long> timer = Observable.interval(2, TimeUnit.SECONDS);
+
+               return simulateRemoteOperation(colorName) // <- Still a stream
+                              .zipWith(timer, (val, timerVal) -> val)
+                              .count()
+                              .map(counter -> new Pair<>(colorName, counter));
+               }
+    );
+```
+
+## Error handling
+Code at [Part08ErrorHandling.java](https://github.com/balamaci/rxjava-playground/blob/master/src/test/java/com/balamaci/rx/Part08ErrorHandling.java)
+
+Exceptions are for exceptional situations.
+The Observable contract specifies that exceptions are terminal operations. That means in case of error, the subscriber unsubscribes from the streams and no new events will be processed:
+
+```
+Observable<String> colors = Observable.just("green", "blue", "red", "yellow")
+       .map(color -> {
+              if ("red".equals(color)) {
+                        throw new RuntimeException("Encountered red");
+              }
+              return color + "*";
+       })
+       .map(val -> val + "XXX");
+
+colors.subscribe(
+         val -> log.info("Subscriber received: {}", val),
+         exception -> log.error("Subscriber received error '{}'", exception.getMessage()),
+         () -> log.info("Subscriber completed")
+);
+```
+returns:
+```
+23:30:17 [main] INFO - Subscriber received: green*XXX
+23:30:17 [main] INFO - Subscriber received: blue*XXX
+23:30:17 [main] ERROR - Subscriber received error 'Encountered red'
+```
+After the map() operator encounters an error, it unsubscribed, therefore 'yellow' was not even sent downstream.
+So the idea might be to keep Exceptions for exceptional situations and instead return .
+
+However there are operators to deal with error flow control. 
+
+Let's introduce a more realcase scenario of a simulated remote request that might fail 
+```
+private Observable<String> simulateRemoteOperation(String color) {
+    return Observable.<String>create(subscriber -> {
+         if ("red".equals(color)) {
+              log.info("Emitting RuntimeException for {}", color);
+              throw new RuntimeException("Color red raises exception");
+         }
+         if ("black".equals(color)) {
+              log.info("Emitting IllegalArgumentException for {}", color);
+              throw new IllegalArgumentException("Black is not a color");
+         }
+
+         String value = "**" + color + "**";
+
+         log.info("Emitting {}", value);
+         subscriber.onNext(value);
+         subscriber.onCompleted();
+    });
+}
+```
+
+
+### onErrorReturn
+
+The 'onErrorReturn' operator replaces an exception with a value:
+```
+Observable<String> colors = Observable.just("green", "blue", "red", "white", "blue")
+                .flatMap(color -> simulateRemoteOperation(color))
+                .onErrorReturn(throwable -> "-blank-");
+                
+subscribeWithLog(colors);
+```
+returns:
+```
+22:15:51 [main] INFO - Emitting **green**
+22:15:51 [main] INFO - Subscriber received: **green**
+22:15:51 [main] INFO - Emitting **blue**
+22:15:51 [main] INFO - Subscriber received: **blue**
+22:15:51 [main] INFO - Emitting RuntimeException for red
+22:15:51 [main] INFO - Subscriber received: -blank-
+22:15:51 [main] INFO - Subscriber got Completed event
+```
+flatMap encounters an error when it subscribes to 'red' substreams and thus still unsubscribe from 'colors' 
+stream and the remaining colors are not longer emitted
+
+
+```
+Observable<String> colors = Observable.just("green", "blue", "red", "white", "blue")
+                .flatMap(color -> simulateRemoteOperation(color)
+                                    .onErrorReturn(throwable -> "-blank-")
+                );
+```
+onErrorReturn() is applied to the flatMap substream and thus translates the exception to a value and so flatMap 
+continues on with the other colors after red
+
+returns:
+```
+22:15:51 [main] INFO - Emitting **green**
+22:15:51 [main] INFO - Subscriber received: **green**
+22:15:51 [main] INFO - Emitting **blue**
+22:15:51 [main] INFO - Subscriber received: **blue**
+22:15:51 [main] INFO - Emitting RuntimeException for red
+22:15:51 [main] INFO - Subscriber received: -blank-
+22:15:51 [main] INFO - Emitting **white**
+22:15:51 [main] INFO - Subscriber received: **white**
+22:15:51 [main] INFO - Emitting **blue**
+22:15:51 [main] INFO - Subscriber received: **blue**
+22:15:51 [main] INFO - Subscriber got Completed event
+```
+
+### onErrorResumeNext
+onErrorResumeNext() returns a stream instead of an exception, useful for example to invoke a fallback 
+method that returns also a stream
+
+```
+Observable<String> colors = Observable.just("green", "blue", "red", "white", "blue")
+     .flatMap(color -> simulateRemoteOperation(color)
+                        .onErrorResumeNext(th -> {
+                            if (th instanceof IllegalArgumentException) {
+                                return Observable.error(new RuntimeException("Fatal, wrong arguments"));
+                            }
+                            return fallbackRemoteOperation();
+                        })
+     );
+...
+private Observable<String> fallbackRemoteOperation() {
+        return Observable.just("blank");
+}
+```
+
+## Retrying
+
+### timeout()
+Timeout operator raises exception when there are no events incoming before it's predecessor in the specified time limit.
+
+### retry()
+**retry()** - resubscribes in case of exception to the Observable
+
+```
+Observable<String> colors = Observable.just("red", "blue", "green", "yellow")
+       .concatMap(color -> delayedByLengthEmitter(TimeUnit.SECONDS, color) //we're delaying by string length secs
+                             .timeout(6, TimeUnit.SECONDS) //if there are no events flowing in the timeframe 
+                             .retry(2)
+                             .onErrorResumeNext(Observable.just("blank"))
+       );
+
+subscribeWithLog(colors.toBlocking());
+```
+
+returns
+```
+12:40:16 [main] INFO - Received red delaying for 3 
+12:40:19 [main] INFO - Subscriber received: red
+12:40:19 [RxComputationScheduler-2] INFO - Received blue delaying for 4 
+12:40:23 [main] INFO - Subscriber received: blue
+12:40:23 [RxComputationScheduler-4] INFO - Received green delaying for 5 
+12:40:28 [main] INFO - Subscriber received: green
+12:40:28 [RxComputationScheduler-6] INFO - Received yellow delaying for 6 
+12:40:34 [RxComputationScheduler-7] INFO - Received yellow delaying for 6 
+12:40:40 [RxComputationScheduler-1] INFO - Received yellow delaying for 6 
+12:40:46 [main] INFO - Subscriber received: blank
+12:40:46 [main] INFO - Subscriber got Completed event
+```
+
+When you want to retry considering the thrown exception type:
+```
+Observable<String> colors = Observable.just("blue", "red", "black", "yellow")
+         .flatMap(colorName -> simulateRemoteOperation(colorName)
+                .retry((retryAttempt, exception) -> {
+                           if (exception instanceof IllegalArgumentException) {
+                               log.error("{} encountered non retry exception ", colorName);
+                               return false;
+                           }
+                           log.info("Retry attempt {} for {}", retryAttempt, colorName);
+                           return retryAttempt <= 2;
+                })
+                .onErrorResumeNext(Observable.just("generic color"))
+         );
+```
+
+```
+13:21:37 [main] INFO - Emitting **blue**
+13:21:37 [main] INFO - Emitting RuntimeException for red
+13:21:37 [main] INFO - Retry attempt 1 for red
+13:21:37 [main] INFO - Emitting RuntimeException for red
+13:21:37 [main] INFO - Retry attempt 2 for red
+13:21:37 [main] INFO - Emitting RuntimeException for red
+13:21:37 [main] INFO - Retry attempt 3 for red
+13:21:37 [main] INFO - Emitting IllegalArgumentException for black
+13:21:37 [main] ERROR - black encountered non retry exception 
+13:21:37 [main] INFO - Emitting **yellow**
+13:21:37 [main] INFO - Subscriber received: **blue**
+13:21:37 [main] INFO - Subscriber received: generic color
+13:21:37 [main] INFO - Subscriber received: generic color
+13:21:37 [main] INFO - Subscriber received: **yellow**
+13:21:37 [main] INFO - Subscriber got Completed event
+```
+
+### retryWhen
+A more complex retry logic like implementing a backoff strategy in case of exception
+This can be obtained with **retryWhen**(exceptionObservable -> Observable)
+
+retryWhen resubscribes when an event from an Observable is emitted. It receives as parameter an exception stream
+     
+we zip the exceptionsStream with a .range() stream to obtain the number of retries,
+however we want to wait a little before retrying so in the zip function we return a delayed event - .timer()
+
+The delay also needs to be subscribed to be effected so we also flatMap
+
+```
+Observable<String> colors = Observable.just("blue", "green", "red", "black", "yellow");
+
+colors.flatMap(colorName -> 
+                   simulateRemoteOperation(colorName)
+                      .retryWhen(exceptionStream -> exceptionStream
+                                    .zipWith(Observable.range(1, 3), (exc, attempts) -> {
+                                        //don't retry for IllegalArgumentException
+                                        if(exc instanceof IllegalArgumentException) {
+                                             return Observable.error(exc);
+                                        }
+
+                                        if(attempts < 3) {
+                                             return Observable.timer(2 * attempts, TimeUnit.SECONDS);
+                                        }
+                                        return Observable.error(exc);
+                                    })
+                                    .flatMap(val -> val)
+                      )
+                      .onErrorResumeNext(Observable.just("generic color")
+                   )
+            );
+```
+
+```
+15:20:23 [main] INFO - Emitting **blue**
+15:20:23 [main] INFO - Emitting **green**
+15:20:23 [main] INFO - Emitting RuntimeException for red
+15:20:23 [main] INFO - Emitting IllegalArgumentException for black
+15:20:23 [main] INFO - Emitting **yellow**
+15:20:23 [main] INFO - Subscriber received: **blue**
+15:20:23 [main] INFO - Subscriber received: **green**
+15:20:23 [main] INFO - Subscriber received: generic color
+15:20:23 [main] INFO - Subscriber received: **yellow**
+15:20:25 [RxComputationScheduler-1] INFO - Emitting RuntimeException for red
+15:20:29 [RxComputationScheduler-2] INFO - Emitting RuntimeException for red
+15:20:29 [main] INFO - Subscriber received: generic color
+15:20:29 [main] INFO - Subscriber got Completed event
+```
+
+**retryWhen vs repeatWhen** 
+With similar names it worth noting the difference.
  
-**RuleOfThumb 1**: when you have an 'item' and you need Observable<X> you need flatMap
+   - repeat() resubscribes when it receives onCompleted().
+   - retry() resubscribes when it receives onError().
+   
+Example using repeatWhen() to implement periodic polling
+```
+remoteOperation.repeatWhen(completed -> completed
+                                         .delay(2, TimeUnit.SECONDS))                                                       
+```   

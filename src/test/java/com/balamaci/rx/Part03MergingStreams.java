@@ -7,7 +7,6 @@ import rx.Observable;
 import rx.observables.BlockingObservable;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -30,8 +29,6 @@ public class Part03MergingStreams implements BaseTestObservables {
      */
     @Test
     public void zipUsedForTakingTheResultOfCombinedAsyncOperations() {
-        CountDownLatch latch = new CountDownLatch(1);
-
         Observable<Boolean> isUserBlockedStream = Observable.from(CompletableFuture.supplyAsync(() -> {
             Helpers.sleepMillis(200);
             return Boolean.FALSE;
@@ -42,10 +39,9 @@ public class Part03MergingStreams implements BaseTestObservables {
         }));
 
         Observable<Pair<Boolean, Integer>> userCheckStream = Observable.zip(isUserBlockedStream, userCreditScoreStream,
-                (blocked, creditScore) -> new Pair<Boolean, Integer>(blocked, creditScore));
-        subscribeWithLog(userCheckStream, latch);
+                (blocked, creditScore) -> new Pair<>(blocked, creditScore));
+        subscribeWithLogWaiting(userCheckStream);
 
-        Helpers.wait(latch);
     }
 
     /**
@@ -55,15 +51,12 @@ public class Part03MergingStreams implements BaseTestObservables {
      */
     @Test
     public void zipUsedToSlowDownAnotherStream() {
-        CountDownLatch latch = new CountDownLatch(1);
-
         Observable<String> colors = Observable.just("red", "green", "blue");
         Observable<Long> timer = Observable.interval(2, TimeUnit.SECONDS);
 
         Observable<String> periodicEmitter = Observable.zip(colors, timer, (key, val) -> key);
-        subscribeWithLog(periodicEmitter, latch);
 
-        Helpers.wait(latch);
+        subscribeWithLogWaiting(periodicEmitter);
     }
 
 
@@ -113,16 +106,13 @@ public class Part03MergingStreams implements BaseTestObservables {
      */
     @Test
     public void combineLatest() {
-        CountDownLatch latch = new CountDownLatch(1);
-
         log.info("Starting");
 
         Observable<String> colors = periodicEmitter("red", "green", "blue", 3, TimeUnit.SECONDS);
         Observable<Long> numbers = Observable.interval(1, TimeUnit.SECONDS)
                 .take(4);
         Observable observable = Observable.combineLatest(colors, numbers, Pair::new);
-        subscribeWithLog(observable, latch);
 
-        Helpers.wait(latch);
+        subscribeWithLogWaiting(observable);
     }
 }

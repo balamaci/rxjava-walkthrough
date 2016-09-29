@@ -7,15 +7,15 @@ import rx.Observable;
 import rx.observables.GroupedObservable;
 import rx.schedulers.Schedulers;
 
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /**
  * The flatMap operator is so important and has so many different uses it deserves it's own category to explain
  * I like to think of it as a sort of fork-join operation because what flatMap does is it takes individual items
  * and maps each of them to an Observable(so it creates new Streams from each object) and then 'flattens' the
  * events from these Streams back into a single Stream.
- * Why this looks like fork-join because for each element you can fork some async jobs that emitting events before completing,
- * and these results are emitted back as elements to the subscribers downstream
+ * Why this looks like fork-join because for each element you can fork some async jobs that emit some items before completing,
+ * and these items are sent downstream to the subscribers as coming from a single stream
  *
  * RuleOfThumb 1: When you have an 'item' as parameter and you need to invoke something that returns an
  *                    Observable<T> instead of <T>, you need flatMap
@@ -26,38 +26,39 @@ import java.util.concurrent.CountDownLatch;
 public class Part06FlatMapOperator implements BaseTestObservables {
 
     /**
-     * Common usecase when for each item you make an async remote call that returns a Stream of results
+     * Common usecase when for each item you make an async remote call that returns a stream of items (an Observable<T>)
      *
      * The thing to notice that it's not clear upfront that events from the flatMaps 'substreams' don't arrive
-     * in a guaranteed order and events from a Stream might get interleaved with the events from other substreams.
+     * in a guaranteed order and events from a substream might get interleaved with the events from other substreams.
+     *
      */
     @Test
     public void flatMap() {
-        CountDownLatch latch = new CountDownLatch(1);
-
-        Observable<String> colors = Observable.just("orange", "red", "green", "blue")
+        Observable<String> colors = Observable.just("orange", "red", "green")
                 .flatMap(colorName -> simulateRemoteOperation(colorName));
-        subscribeWithLog(colors, latch);
 
-        Helpers.wait(latch);
+        subscribeWithLogWaiting(colors);
     }
 
     /**
-     *
+     * Inside the flatMap we can operate on the substream with the same stream operators like for ex count
      */
     @Test
     public void flatMapSubstreamOperations() {
-        CountDownLatch latch = new CountDownLatch(1);
-
         Observable<String> colors = Observable.just("orange", "red", "green", "blue");
 
         Observable<Pair<String, Integer>> colorsCounted = colors
-                .flatMap(colorName -> simulateRemoteOperation(colorName)
-                                .count()
-                                .map(counter -> new Pair<>(colorName, counter)));
-        subscribeWithLog(colors, latch);
+                .flatMap(colorName -> {
+                    Observable<Long> timer = Observable.interval(2, TimeUnit.SECONDS);
 
-        Helpers.wait(latch);
+                    return simulateRemoteOperation(colorName) // <- Still a stream
+                                    .zipWith(timer, (val, timerVal) -> val)
+                                    .count()
+                                    .map(counter -> new Pair<>(colorName, counter));
+                    }
+                );
+
+        subscribeWithLogWaiting(colorsCounted);
     }
 
 
@@ -69,13 +70,10 @@ public class Part06FlatMapOperator implements BaseTestObservables {
      */
     @Test
     public void flatMapConcurrency() {
-        CountDownLatch latch = new CountDownLatch(1);
-
-        Observable<String> colors = Observable.just("orange", "red", "green", "blue")
+        Observable<String> colors = Observable.just("orange", "red", "green")
                 .flatMap(val -> simulateRemoteOperation(val), 1);
-        subscribeWithLog(colors, latch);
 
-        Helpers.wait(latch);
+        subscribeWithLog(colors);
     }
 
     /**
@@ -87,45 +85,50 @@ public class Part06FlatMapOperator implements BaseTestObservables {
      */
     @Test
     public void concatMap() {
-        CountDownLatch latch = new CountDownLatch(1);
-
         Observable<String> colors = Observable.just("orange", "red", "green", "blue")
                 .subscribeOn(Schedulers.io())
                 .concatMap(val -> simulateRemoteOperation(val));
-        subscribeWithLog(colors, latch);
 
-        Helpers.wait(latch);
+        subscribeWithLogWaiting(colors);
     }
 
     /**
-     * When you have a Stream of Streams(Observable<Observable<T>>)
+     * When you have a Stream of Streams - Observable<Observable<T>>
      */
+    @Test
     public void flatMapFor() {
-        CountDownLatch latch = new CountDownLatch(1);
-
         Observable<String> colors = Observable.from(new String[]{"red", "green", "blue",
                 "red", "yellow", "green", "green"});
 
         Observable<GroupedObservable<String, String>> groupedColorsStream = colors
-                                                                                .groupBy(val -> val);
-        groupedColorsStream.flatMap(groupedObservable
+                                                                                .groupBy(val -> val);//grouping key
+                                                                                // is the String itself, the color
+
+        Observable<Pair<String, Integer>> countedColors = groupedColorsStream.flatMap(groupedObservable
                                         -> groupedObservable
                                                 .count()
                                                 .map(countVal -> new Pair<>(groupedObservable.getKey(), countVal))
                             );
+        subscribeWithLogWaiting(countedColors);
     }
 
-
+    /**
+     * Simulated remote operation that emits as many events as the length of the color string
+     * @param color color
+     * @return
+     */
     private Observable<String> simulateRemoteOperation(String color) {
         return Observable.<String>create(subscriber -> {
-            for(int i=0; i < color.length(); i++) {
-                subscriber.onNext(color + i);
-                Helpers.sleepMillis(200);
-            }
+            Runnable asyncRun = () -> {
+                for (int i = 0; i < color.length(); i++) {
+                    subscriber.onNext(color + i);
+                    Helpers.sleepMillis(200);
+                }
 
-            subscriber.onCompleted();
-        })
-                .subscribeOn(Schedulers.io());
+                subscriber.onCompleted();
+            };
+            new Thread(asyncRun).start();
+        });
     }
 
 }
