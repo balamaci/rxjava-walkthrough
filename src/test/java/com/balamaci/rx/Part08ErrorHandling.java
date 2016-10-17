@@ -4,7 +4,9 @@ import org.junit.Test;
 import rx.Observable;
 
 import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Exceptions are for exceptional situations.
@@ -12,6 +14,8 @@ import java.util.concurrent.TimeUnit;
  * There are however operator available for error flow control
  */
 public class Part08ErrorHandling implements BaseTestObservables {
+
+    private static final ConcurrentHashMap<String, AtomicInteger> attemptsMap = new ConcurrentHashMap<>();
 
     /**
      * After the map() operator encounters an error, it unsubscribes,
@@ -53,7 +57,6 @@ public class Part08ErrorHandling implements BaseTestObservables {
     }
 
 
-
     @Test
     public void onErrorReturnWithFlatMap() {
         //flatMap encounters an error when it subscribes to 'red' substreams and thus unsubscribe from
@@ -70,7 +73,7 @@ public class Part08ErrorHandling implements BaseTestObservables {
         //a value and so flatMap continues on with the other colors after red
         colors = Observable.just("green", "blue", "red", "white", "blue")
                 .flatMap(color -> simulateRemoteOperation(color)
-                                    .onErrorReturn(throwable -> "-blank-")  //onErrorReturn doesn't trigger
+                                .onErrorReturn(throwable -> "-blank-")  //onErrorReturn doesn't trigger
                         // the onError() inside flatMap so it doesn't unsubscribe from 'colors'
                 );
 
@@ -102,7 +105,6 @@ public class Part08ErrorHandling implements BaseTestObservables {
     }
 
 
-
     /**
      ************* Retry Logic ****************
      ****************************************** */
@@ -110,16 +112,16 @@ public class Part08ErrorHandling implements BaseTestObservables {
     /**
      * timeout operator raises exception when there are no events incoming before it's predecessor in the specified
      * time limit
-     *
+     * <p>
      * retry() resubscribes in case of exception to the Observable
      */
     @Test
     public void timeoutWithRetry() {
         Observable<String> colors = Observable.just("red", "blue", "green", "yellow")
-                .concatMap(color ->  delayedByLengthEmitter(TimeUnit.SECONDS, color)
-                                        .timeout(6, TimeUnit.SECONDS)
-                                        .retry(2)
-                                        .onErrorResumeNext(Observable.just("blank"))
+                .concatMap(color -> delayedByLengthEmitter(TimeUnit.SECONDS, color)
+                        .timeout(6, TimeUnit.SECONDS)
+                        .retry(2)
+                        .onErrorResumeNext(Observable.just("blank"))
                 );
 
         subscribeWithLog(colors.toBlocking());
@@ -134,16 +136,16 @@ public class Part08ErrorHandling implements BaseTestObservables {
         Observable<String> colors = Observable.just("blue", "red", "black", "yellow");
 
         colors = colors
-                .flatMap(colorName -> simulateRemoteOperation(colorName)
-                            .retry((retryAttempt, exception) -> {
-                                if (exception instanceof IllegalArgumentException) {
-                                    log.error("{} encountered non retry exception ", colorName);
-                                    return false;
-                                }
-                                log.info("Retry attempt {} for {}", retryAttempt, colorName);
-                                return retryAttempt <= 2;
-                            })
-                            .onErrorResumeNext(Observable.just("generic color"))
+                .flatMap(colorName -> simulateRemoteOperation(colorName, 2)
+                        .retry((retryAttempt, exception) -> {
+                            if (exception instanceof IllegalArgumentException) {
+                                log.error("{} encountered non retry exception ", colorName);
+                                return false;
+                            }
+                            log.info("Retry attempt {} for {}", retryAttempt, colorName);
+                            return retryAttempt <= 3;
+                        })
+                        .onErrorResumeNext(Observable.just("generic color"))
                 );
 
         subscribeWithLog(colors.toBlocking());
@@ -152,36 +154,36 @@ public class Part08ErrorHandling implements BaseTestObservables {
     /**
      * A more complex retry logic like implementing a backoff strategy in case of exception
      * This can be obtained with retryWhen(exceptionObservable -> Observable)
-     *
+     * <p>
      * retryWhen resubscribes when an event from an Observable is emitted. It receives as parameter an exception stream
-     *
+     * <p>
      * we zip the exceptionsStream with a .range() stream to obtain the number of retries,
      * however we want to wait a little before retrying so in the zip function we return a delayed event - .timer()
-     *
+     * <p>
      * The delay also needs to be subscribed to be effected so we also need flatMap
-     *
      */
     @Test
     public void retryWhenUsedForRetryWithBackoff() {
         Observable<String> colors = Observable.just("blue", "green", "red", "black", "yellow");
 
         colors = colors.flatMap(colorName ->
-                                  simulateRemoteOperation(colorName)
-                                    .retryWhen(exceptionStream -> exceptionStream
-                                                .zipWith(Observable.range(1, 3), (exc, attempts) -> {
-                                                    //don't retry for IllegalArgumentException
-                                                    if(exc instanceof IllegalArgumentException) {
-                                                        return Observable.error(exc);
-                                                    }
+                    simulateRemoteOperation(colorName, 3)
+                        .retryWhen(exceptionStream -> exceptionStream
+                                .zipWith(Observable.range(1, 3), (exc, attempts) -> {
+                                    //don't retry for IllegalArgumentException
+                                    if (exc instanceof IllegalArgumentException) {
+                                        return Observable.error(exc);
+                                    }
 
-                                                    if(attempts < 3) {
-                                                        return Observable.timer(2 * attempts, TimeUnit.SECONDS);
-                                                    }
-                                                    return Observable.error(exc);
-                                                })
-                                                .flatMap(val -> val)
-                                    )
-                                  .onErrorResumeNext(Observable.just("generic color")
+                                    if (attempts < 3) {
+                                        log.info("Attempt {}, waiting before retry", attempts);
+                                        return Observable.timer(2 * attempts, TimeUnit.SECONDS);
+                                    }
+                                    return Observable.error(exc);
+                                })
+                                .flatMap(val -> val)
+                        )
+                        .onErrorResumeNext(Observable.just("generic color")
                         )
         );
 
@@ -194,25 +196,41 @@ public class Part08ErrorHandling implements BaseTestObservables {
     @Test
     public void testRepeatWhen() {
         Observable<Integer> remoteOperation = Observable.defer(() -> {
-                    Random random = new Random();
-                    return Observable.just(random.nextInt(10));
-                });
+            Random random = new Random();
+            return Observable.just(random.nextInt(10));
+        });
 
         remoteOperation = remoteOperation.repeatWhen(completed -> completed
-                                                    .delay(2, TimeUnit.SECONDS)
-                        ).take(10);
+                                                .delay(2, TimeUnit.SECONDS)
+                                          )
+                                .take(10);
         subscribeWithLogWaiting(remoteOperation);
     }
 
     private Observable<String> simulateRemoteOperation(String color) {
-        return Observable.<String>create(subscriber -> {
+        return simulateRemoteOperation(color, Integer.MAX_VALUE);
+    }
+
+    private Observable<String> simulateRemoteOperation(String color, int workAfterAttempts) {
+        return Observable.create(subscriber -> {
+            AtomicInteger attemptsHolder = attemptsMap.computeIfAbsent(color, (colorKey) -> new AtomicInteger(0));
+            int attempts = attemptsHolder.incrementAndGet();
+
             if ("red".equals(color)) {
-                log.info("Emitting RuntimeException for {}", color);
-                throw new RuntimeException("Color red raises exception");
+                if(attempts < workAfterAttempts) {
+                    log.info("Emitting RuntimeException for {}", color);
+                    throw new RuntimeException("Color red raises exception");
+                } else {
+                    log.info("After attempt {} we don't throw exception", attempts);
+                }
             }
             if ("black".equals(color)) {
-                log.info("Emitting IllegalArgumentException for {}", color);
-                throw new IllegalArgumentException("Black is not a color");
+                if(attempts < workAfterAttempts) {
+                    log.info("Emitting IllegalArgumentException for {}", color);
+                    throw new IllegalArgumentException("Black is not a color");
+                } else {
+                    log.info("After attempt {} we don't throw exception", attempts);
+                }
             }
 
             String value = "**" + color + "**";
