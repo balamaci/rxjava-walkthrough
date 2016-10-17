@@ -14,7 +14,8 @@ import java.util.concurrent.TimeUnit;
 public class Part08ErrorHandling implements BaseTestObservables {
 
     /**
-     * After the map() operator encounters an error, it unsubscribes,
+     * After the map() operator encounters an error, it triggers the error handler
+     * in the subscriber which also unsubscribes from the stream,
      * therefore 'yellow' is not even sent downstream.
      */
     @Test

@@ -435,7 +435,9 @@ Observable<Pair<String, Integer>> colorsCounted = colors
 Code at [Part08ErrorHandling.java](https://github.com/balamaci/rxjava-playground/blob/master/src/test/java/com/balamaci/rx/Part08ErrorHandling.java)
 
 Exceptions are for exceptional situations.
-The Observable contract specifies that exceptions are terminal operations. That means in case of error, the subscriber unsubscribes from the streams and no new events will be processed:
+The Observable contract specifies that exceptions are terminal operations. 
+That means in case an error reaches the Subscriber, after invoking the 'onError' handler, it also unsubscribes:
+
 
 ```
 Observable<String> colors = Observable.just("green", "blue", "red", "yellow")
@@ -459,8 +461,9 @@ returns:
 23:30:17 [main] INFO - Subscriber received: blue*XXX
 23:30:17 [main] ERROR - Subscriber received error 'Encountered red'
 ```
-After the map() operator encounters an error, it unsubscribed, therefore 'yellow' was not even sent downstream.
-So the idea might be to keep Exceptions for exceptional situations and instead return .
+After the map() operator encounters an error, it triggers the error handler in the subscriber which also unsubscribes(cancels the subscription) from the stream,
+therefore 'yellow' is not even sent downstream.
+
 
 However there are operators to deal with error flow control. 
 
