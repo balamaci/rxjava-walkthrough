@@ -5,6 +5,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import rx.Observable;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
@@ -74,6 +76,54 @@ public class Part02SimpleOperators implements BaseTestObservables {
                         tick -> log.info("Tick {}", tick),
                         (ex) -> log.info("Error emitted"),
                         () -> log.info("Completed"));
+    }
+
+    /**
+     * scan operator - takes an initial value and a function(accumulator, currentValue). It goes through the events
+     * sequence and combines the current event value with the previous result(accumulator) emitting downstream the
+     * The initial value is used for the first event
+     *
+     */
+    @Test
+    public void scanOperator() {
+        Observable<Integer> numbers = Observable.just(3, 5, -2, 9)
+                .scan(0, (totalSoFar, currentValue) -> {
+                    log.info("totalSoFar={}, emitted={}", totalSoFar, currentValue);
+                    return totalSoFar + currentValue;
+                });
+
+        subscribeWithLog(numbers);
+    }
+
+    /**
+     * reduce operator acts like the scan operator but it only passes downstream the final result
+     * (doesn't pass the intermediate results downstream) so the subscriber receives just one event
+     */
+    @Test
+    public void reduceOperator() {
+        Observable<Integer> numbers = Observable.just(3, 5, -2, 9)
+                .reduce(0, (totalSoFar, val) -> {
+                    log.info("totalSoFar={}, emitted={}", totalSoFar, val);
+                    return totalSoFar + val;
+                });
+        subscribeWithLog(numbers);
+    }
+
+    /**
+     * collect operator acts similar to the reduce() operator, but while the reduce() operator uses a reduce function
+     * which returns a value, the collect() operator takes a container supplie and a function which doesn't return
+     * anything(a consumer). The mutable container is passed for every event and thus you get a chance to modify it
+     * in this collect consumer function
+     */
+    @Test
+    public void collectOperator() {
+        Observable<List<Integer>> numbers = Observable.just(3, 5, -2, 9)
+                .collect(ArrayList::new, (container, value) -> {
+                    log.info("Adding {} to container", value);
+                    container.add(value);
+                    //notice we don't need to return anything
+                });
+        subscribeWithLog(numbers);
     }
 
     /**

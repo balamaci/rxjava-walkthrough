@@ -186,6 +186,78 @@ will terminate before we see the text from the log.
 To prevent this we use the **.toBlocking()** operator which returns a **BlockingObservable**. Operators on
 **BlockingObservable** block(wait) until upstream Observable is completed
 
+### scan
+Takes an initial value and a function(accumulator, currentValue). It goes through the events 
+sequence and combines the current event value with the previous result(accumulator) emitting downstream the
+The initial value is used for the first event
+
+```
+Observable<Integer> numbers = 
+                Observable.just(3, 5, -2, 9)
+                    .scan(0, (totalSoFar, currentValue) -> {
+                               log.info("TotalSoFar={}, currentValue={}", totalSoFar, currentValue);
+                               return totalSoFar + currentValue;
+                    });
+```
+
+```
+16:09:17 [main] - Subscriber received: 0
+16:09:17 [main] - TotalSoFar=0, currentValue=3
+16:09:17 [main] - Subscriber received: 3
+16:09:17 [main] - TotalSoFar=3, currentValue=5
+16:09:17 [main] - Subscriber received: 8
+16:09:17 [main] - TotalSoFar=8, currentValue=-2
+16:09:17 [main] - Subscriber received: 6
+16:09:17 [main] - TotalSoFar=6, currentValue=9
+16:09:17 [main] - Subscriber received: 15
+16:09:17 [main] - Subscriber got Completed event
+```
+
+### reduce
+reduce operator acts like the scan operator but it only passes downstream the final result 
+(doesn't pass the intermediate results downstream) so the subscriber receives just one event
+
+```
+Observable<Integer> numbers = Observable.just(3, 5, -2, 9)
+                            .reduce(0, (totalSoFar, val) -> {
+                                         log.info("totalSoFar={}, emitted={}", totalSoFar, val);
+                                         return totalSoFar + val;
+                            });
+```
+
+```
+17:08:29 [main] - totalSoFar=0, emitted=3
+17:08:29 [main] - totalSoFar=3, emitted=5
+17:08:29 [main] - totalSoFar=8, emitted=-2
+17:08:29 [main] - totalSoFar=6, emitted=9
+17:08:29 [main] - Subscriber received: 15
+17:08:29 [main] - Subscriber got Completed event
+```
+
+### collect
+collect operator acts similar to the _reduce_ operator, but while the _reduce_ operator uses a reduce function
+which returns a value, the _collect_ operator takes a container supplier and a function which doesn't return
+anything(a consumer). The mutable container is passed for every event and thus you get a chance to modify it
+in this collect consumer function.
+
+```
+Observable<List<Integer>> numbers = Observable.just(3, 5, -2, 9)
+                                        .collect(ArrayList::new, (container, value) -> {
+                                            log.info("Adding {} to container", value);
+                                            container.add(value);
+                                            //notice we don't need to return anything
+                                        });
+```
+```
+17:40:18 [main] - Adding 3 to container
+17:40:18 [main] - Adding 5 to container
+17:40:18 [main] - Adding -2 to container
+17:40:18 [main] - Adding 9 to container
+17:40:18 [main] - Subscriber received: [3, 5, -2, 9]
+17:40:18 [main] - Subscriber got Completed event
+```
+
+because the usecase to store to a List container is so common, there is a **.toList()** operator that is just a collector adding to a List. 
 
 
 ## Merging Streams
@@ -394,6 +466,7 @@ Notice how the results are coming intertwined. This is because flatMap actually 
 returned from 'simulateRemoteOperation'. You can specify the concurrency level of flatMap as a parameter. Meaning 
 you can say how many of the substreams should be subscribed "concurrently" - aka before the onComplete 
 event is triggered on the substreams.
+
 By setting the concurrency to **1** we don't subscribe to other substreams until the current one finishes:
 ```
 Observable<String> colors = Observable.just("orange", "red", "green")
