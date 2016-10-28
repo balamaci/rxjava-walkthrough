@@ -171,12 +171,12 @@ Observable.interval(5, TimeUnit.SECONDS)
                   (ex) -> log.info("Error emitted"),
                   () -> log.info("Completed"));
 //results
-22:27:44 [main] INFO Part02SimpleOperators - Starting
-22:27:49 [main] INFO Part02SimpleOperators - Tick 0
-22:27:54 [main] INFO Part02SimpleOperators - Tick 1
-22:27:59 [main] INFO Part02SimpleOperators - Tick 2
-22:28:04 [main] INFO Part02SimpleOperators - Tick 3
-22:28:04 [main] INFO Part02SimpleOperators - Completed
+22:27:44 [main] - Starting
+22:27:49 [main] - Tick 0
+22:27:54 [main] - Tick 1
+22:27:59 [main] - Tick 2
+22:28:04 [main] - Tick 3
+22:28:04 [main] - Completed
 ```
 
 The delay operator uses a [Scheduler](#schedulers) by default, which actually means it's
@@ -200,6 +200,8 @@ to merge the two events.
 This is an useful scenario when for example you want to make requests to remote services in parallel and
 wait for both responses before continuing. It also takes a function which will produce the combined result
 of the zipped streams once each has emitted a value.
+
+![Zip](https://raw.githubusercontent.com/reactor/projectreactor.io/master/src/main/static/assets/img/marble/zip.png)
 
 Zip operator besides the streams to zip, also takes as parameter a function which will produce the 
 combined result of the zipped streams once each stream emitted it's value
@@ -241,6 +243,7 @@ with zip setting the pace of emissions downstream every 2 seconds.
 
 ### merge
 Merge operator combines one or more stream and passes events downstream as soon as they appear.
+![merge](https://raw.githubusercontent.com/reactor/projectreactor.io/master/src/main/static/assets/img/marble/merge.png)
 
 ```
 Observable<String> colors = periodicEmitter("red", "green", "blue", 2, TimeUnit.SECONDS);
@@ -262,6 +265,7 @@ Observable<Long> numbers = Observable.interval(1, TimeUnit.SECONDS)
 
 ### concat
 Concat operator appends another streams at the end of another
+![concat](https://raw.githubusercontent.com/reactor/projectreactor.io/master/src/main/static/assets/img/marble/concat.png)
 
 ```
 Observable<String> colors = periodicEmitter("red", "green", "blue", 2, TimeUnit.SECONDS);
