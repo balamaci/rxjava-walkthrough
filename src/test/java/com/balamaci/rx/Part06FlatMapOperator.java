@@ -1,11 +1,11 @@
 package com.balamaci.rx;
 
 import com.balamaci.rx.util.Helpers;
+import io.reactivex.Observable;
+import io.reactivex.observables.GroupedObservable;
+import io.reactivex.schedulers.Schedulers;
 import javafx.util.Pair;
 import org.junit.Test;
-import rx.Observable;
-import rx.observables.GroupedObservable;
-import rx.schedulers.Schedulers;
 
 import java.util.concurrent.TimeUnit;
 
@@ -47,7 +47,7 @@ public class Part06FlatMapOperator implements BaseTestObservables {
     public void flatMapSubstreamOperations() {
         Observable<String> colors = Observable.just("orange", "red", "green", "blue");
 
-        Observable<Pair<String, Integer>> colorsCounted = colors
+        Observable<Pair<String, Long>> colorsCounted = colors
                 .flatMap(colorName -> {
                     Observable<Long> timer = Observable.interval(2, TimeUnit.SECONDS);
 
@@ -97,8 +97,8 @@ public class Part06FlatMapOperator implements BaseTestObservables {
      */
     @Test
     public void flatMapFor() {
-        Observable<String> colors = Observable.from(new String[]{"red", "green", "blue",
-                "red", "yellow", "green", "green"});
+        Observable<String> colors = Observable.fromArray("red", "green", "blue",
+                "red", "yellow", "green", "green");
 
         Observable<GroupedObservable<String, String>> groupedColorsStream = colors
                                                                                 .groupBy(val -> val);//grouping key
@@ -125,7 +125,7 @@ public class Part06FlatMapOperator implements BaseTestObservables {
                     Helpers.sleepMillis(200);
                 }
 
-                subscriber.onCompleted();
+                subscriber.onComplete();
             };
             new Thread(asyncRun).start();
         });

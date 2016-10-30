@@ -1,10 +1,9 @@
 package com.balamaci.rx;
 
 import com.balamaci.rx.util.Helpers;
+import io.reactivex.Observable;
 import javafx.util.Pair;
 import org.junit.Test;
-import rx.Observable;
-import rx.observables.BlockingObservable;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -29,11 +28,11 @@ public class Part03MergingStreams implements BaseTestObservables {
      */
     @Test
     public void zipUsedForTakingTheResultOfCombinedAsyncOperations() {
-        Observable<Boolean> isUserBlockedStream = Observable.from(CompletableFuture.supplyAsync(() -> {
+        Observable<Boolean> isUserBlockedStream = Observable.fromFuture(CompletableFuture.supplyAsync(() -> {
             Helpers.sleepMillis(200);
             return Boolean.FALSE;
         }));
-        Observable<Integer> userCreditScoreStream = Observable.from(CompletableFuture.supplyAsync(() -> {
+        Observable<Integer> userCreditScoreStream = Observable.fromFuture(CompletableFuture.supplyAsync(() -> {
             Helpers.sleepMillis(2300);
             return 200;
         }));
@@ -76,7 +75,7 @@ public class Part03MergingStreams implements BaseTestObservables {
         Observable<Long> numbers = Observable.interval(1, TimeUnit.SECONDS)
                 .take(5);
 
-        BlockingObservable observable = Observable.merge(colors, numbers).toBlocking();
+        Observable observable = Observable.merge(colors, numbers);
         subscribeWithLog(observable);
     }
 
@@ -96,7 +95,7 @@ public class Part03MergingStreams implements BaseTestObservables {
         Observable<Long> numbers = Observable.interval(1, TimeUnit.SECONDS)
                 .take(4);
 
-        BlockingObservable observable = Observable.concat(colors, numbers).toBlocking();
+        Observable observable = Observable.concat(colors, numbers);
         subscribeWithLog(observable);
     }
 

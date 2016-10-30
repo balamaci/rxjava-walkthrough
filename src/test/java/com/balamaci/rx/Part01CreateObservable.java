@@ -1,11 +1,11 @@
 package com.balamaci.rx;
 
 import com.balamaci.rx.util.Helpers;
+import io.reactivex.Observable;
+import io.reactivex.disposables.Disposable;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import rx.Observable;
-import rx.Subscription;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -35,7 +35,7 @@ public class Part01CreateObservable implements BaseTestObservables {
 
     @Test
     public void fromArray() {
-        Observable<String> observable = Observable.from(new String[]{"red", "green", "blue", "black"});
+        Observable<String> observable = Observable.fromArray(new String[]{"red", "green", "blue", "black"});
 
         observable.subscribe(
                 val -> log.info("Subscriber received: {}"));
@@ -52,12 +52,12 @@ public class Part01CreateObservable implements BaseTestObservables {
                       return "red";
                 });
 
-        Observable<String> observable = Observable.from(completableFuture);
+        Observable<String> observable = Observable.fromFuture(completableFuture);
         observable.subscribe(val -> log.info("Subscriber received: {}", val));
 
 
         completableFuture = CompletableFuture.completedFuture("green");
-        observable = Observable.from(completableFuture);
+        observable = Observable.fromFuture(completableFuture);
         observable.subscribe(val -> log.info("Subscriber2 received: {}", val));
     }
 
@@ -82,11 +82,11 @@ public class Part01CreateObservable implements BaseTestObservables {
             log.info("Emitting 2nd");
             subscriber.onNext(2);
 
-            subscriber.onCompleted();
+            subscriber.onComplete();
         });
 
         log.info("Subscribing");
-        Subscription subscription = observable.subscribe(
+        Disposable subscription = observable.subscribe(
                 val -> log.info("Subscriber received: {}", val),
                 err -> log.error("Subscriber received error", err),
                 () -> log.info("Subscriber got Completed event"));
@@ -150,7 +150,7 @@ public class Part01CreateObservable implements BaseTestObservables {
             log.info("Emitting 2nd event");
             subscriber.onNext(2);
 
-            subscriber.onCompleted();
+            subscriber.onComplete();
         });
 
         log.info("Subscribing 1st subscriber");
@@ -175,7 +175,7 @@ public class Part01CreateObservable implements BaseTestObservables {
 
             int i = 1;
             while(true) {
-                if(subscriber.isUnsubscribed()) {
+                if(subscriber.isDisposed()) {
                     break;
                 }
 

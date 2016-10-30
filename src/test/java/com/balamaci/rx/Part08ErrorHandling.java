@@ -1,7 +1,7 @@
 package com.balamaci.rx;
 
+import io.reactivex.Observable;
 import org.junit.Test;
-import rx.Observable;
 
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
@@ -125,7 +125,7 @@ public class Part08ErrorHandling implements BaseTestObservables {
                         .onErrorResumeNext(Observable.just("blank"))
                 );
 
-        subscribeWithLog(colors.toBlocking());
+        subscribeWithLog(colors);
         //there is also
     }
 
@@ -149,7 +149,7 @@ public class Part08ErrorHandling implements BaseTestObservables {
                         .onErrorResumeNext(Observable.just("generic color"))
                 );
 
-        subscribeWithLog(colors.toBlocking());
+        subscribeWithLog(colors);
     }
 
     /**
@@ -188,7 +188,7 @@ public class Part08ErrorHandling implements BaseTestObservables {
                         )
         );
 
-        subscribeWithLog(colors.toBlocking());
+        subscribeWithLog(colors);
     }
 
     /**
@@ -238,7 +238,7 @@ public class Part08ErrorHandling implements BaseTestObservables {
 
             log.info("Emitting {}", value);
             subscriber.onNext(value);
-            subscriber.onCompleted();
+            subscriber.onComplete();
         });
     }
 

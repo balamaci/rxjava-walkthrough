@@ -1,12 +1,14 @@
 package com.balamaci.rx;
 
 import com.balamaci.rx.util.Helpers;
+import io.reactivex.BackpressureStrategy;
+import io.reactivex.Flowable;
+import io.reactivex.Observable;
+import io.reactivex.schedulers.Schedulers;
+import io.reactivex.subjects.PublishSubject;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import rx.Observable;
-import rx.schedulers.Schedulers;
-import rx.subjects.PublishSubject;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -105,10 +107,10 @@ public class Part09BackpressureHandling implements BaseTestObservables {
     public void dropOverflowingEvents() {
         Observable<Integer> observable = observableWithoutBackpressureSupport();
 
-        observable = observable
-                .onBackpressureDrop(val -> log.info("Dropped {}", val))
+        Flowable<Integer> flowable = observable
+                .toFlowable(BackpressureStrategy.DROP)
                 .observeOn(Schedulers.io());
-        subscribeWithSlowSubscriberAndWait(observable);
+        subscribeWithSlowSubscriberAndWait(flowable);
     }
 
 
@@ -121,7 +123,7 @@ public class Part09BackpressureHandling implements BaseTestObservables {
                 subscriber.onNext(i);
             }
 
-            subscriber.onCompleted();
+            subscriber.onComplete();
         });
     }
 

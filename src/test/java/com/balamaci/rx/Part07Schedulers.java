@@ -1,9 +1,9 @@
 package com.balamaci.rx;
 
 import com.balamaci.rx.util.Helpers;
+import io.reactivex.Observable;
+import io.reactivex.schedulers.Schedulers;
 import org.junit.Test;
-import rx.Observable;
-import rx.schedulers.Schedulers;
 
 /**
  * RxJava provides some high level concepts for concurrent execution, like ExecutorService we're not dealing
@@ -44,7 +44,7 @@ public class Part07Schedulers implements BaseTestObservables {
             log.info("Emitting 1st");
             subscriber.onNext(1);
 
-            subscriber.onCompleted();
+            subscriber.onComplete();
         });
         observable = observable.subscribeOn(Schedulers.io()) //Specify execution on the IO Scheduler
                 .map(val -> {
@@ -120,7 +120,7 @@ public class Part07Schedulers implements BaseTestObservables {
         return Observable.create(subscriber -> {
             log.info("Simulate remote call {}", val);
             subscriber.onNext("***" + val + "***");
-            subscriber.onCompleted();
+            subscriber.onComplete();
         });
     }
 

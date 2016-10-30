@@ -1,9 +1,10 @@
 package com.balamaci.rx;
 
+import io.reactivex.Observable;
+import io.reactivex.Single;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import rx.Observable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,7 +33,6 @@ public class Part02SimpleOperators implements BaseTestObservables {
     public void delayOperator() {
         Observable.range(0, 5)
                 .delay(5, TimeUnit.SECONDS)
-                .toBlocking() //waits on the main thread for the Scheduler thread to finish.
                 .subscribe(
                         tick -> log.info("Tick {}", tick),
                         (ex) -> log.info("Error emitted"),
@@ -56,7 +56,6 @@ public class Part02SimpleOperators implements BaseTestObservables {
     public void delayOperatorWithVariableDelay() {
         Observable.range(0, 5)
                 .delay(val -> Observable.timer(val * 2, TimeUnit.SECONDS))
-                .toBlocking()
                 .subscribe(
                         tick -> log.info("Tick {}", tick),
                         (ex) -> log.info("Error emitted"),
@@ -71,7 +70,6 @@ public class Part02SimpleOperators implements BaseTestObservables {
         log.info("Starting");
         Observable.interval(1, TimeUnit.SECONDS)
                 .take(5)
-                .toBlocking()
                 .subscribe(
                         tick -> log.info("Tick {}", tick),
                         (ex) -> log.info("Error emitted"),
@@ -101,7 +99,7 @@ public class Part02SimpleOperators implements BaseTestObservables {
      */
     @Test
     public void reduceOperator() {
-        Observable<Integer> numbers = Observable.just(3, 5, -2, 9)
+        Single<Integer> numbers = Observable.just(3, 5, -2, 9)
                 .reduce(0, (totalSoFar, val) -> {
                     log.info("totalSoFar={}, emitted={}", totalSoFar, val);
                     return totalSoFar + val;
@@ -117,7 +115,7 @@ public class Part02SimpleOperators implements BaseTestObservables {
      */
     @Test
     public void collectOperator() {
-        Observable<List<Integer>> numbers = Observable.just(3, 5, -2, 9)
+        Single<List<Integer>> numbers = Observable.just(3, 5, -2, 9)
                 .collect(ArrayList::new, (container, value) -> {
                     log.info("Adding {} to container", value);
                     container.add(value);
