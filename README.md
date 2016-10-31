@@ -1,8 +1,10 @@
-# RxJava 1.x
+# RxJava 2.x
+
+also available for [reactor-core]() 
 
 ## Contents 
  
-   - [Observable](#observable)
+   - [Flowable, Single and Observable](#flowable)
    - [Simple Operators](#simple-operators)
    - [Merging Streams](#merging-streams)
    - [FlatMap Operator](#flatmap-operator)
@@ -13,15 +15,17 @@
 ## Flowable, 
 Code is available at [Part01CreateFlowable.java](https://github.com/balamaci/rxjava-playground/blob/master/src/test/java/com/balamaci/rx/Part01CreateFlowable.java)
 
-### Simple operators to create Observables
+### Simple operators to create Streams
 
 ```
-Observable<Integer> observable = Observable.just(1, 5, 10);
-Observable<Integer> observable = Observable.range(1, 10);
-Observable<String> observable = Observable.from(new String[] {"red", "green", "blue", "black"});
+Flowable<Integer> flowable = Flowable.just(1, 5, 10);
+Flowable<Integer> flowable = Flowable.range(1, 10);
+Flowable<String> flowable = Flowable.fromArray(new String[] {"red", "green", "blue", "black"});
 ```
 
-### Observable from Future
+
+
+### Flowable from Future
 
 ```
 CompletableFuture<String> completableFuture = CompletableFuture
@@ -31,15 +35,15 @@ CompletableFuture<String> completableFuture = CompletableFuture
                     return "red";
             });
 
-Observable<String> observable = Observable.from(completableFuture);
+Single<String> observable = Single.from(completableFuture);
 ```
 
-### Creating your own Observable
+### Creating your own stream
 
-Using **Observable.create** to handle the actual emissions of events with the events like **onNext**, **onCompleted**, **onError**
+Using **Flowable.create** to handle the actual emissions of events with the events like **onNext**, **onComplete**, **onError**
 
-When subscribing to the Observable with observable.subscribe(...) the lambda code inside create() gets executed.
-Observable.subscribe(...) can take 3 handlers for each type of event - onNext, onError and onCompleted.
+When subscribing to the Flowable with flowable.subscribe(...) the lambda code inside create() gets executed.
+Flowable.subscribe(...) can take 3 handlers for each type of event - onNext, onError and onCompleted.
 
 When using Observable.create you need to be aware of [BackPressure]() and that Observables created with 'create' are not BackPressure aware
 
@@ -63,8 +67,8 @@ observable.subscribe(
 );
 ```
 
-### Observables are lazy 
-Observables are lazy meaning that the code inside create() doesn't get executed without subscribing to the Observable.
+### Streams are lazy 
+Streams are lazy meaning that the code inside create() doesn't get executed without subscribing to the stream.
 So event if we sleep for a long time inside create() method(to simulate a costly operation),
 without subscribing to this Observable the code is not executed and the method returns immediately.
 
@@ -110,19 +114,19 @@ observable.subscribe(val -> log.info("Second Subscriber received: {}", val));
 will output
 
 ```
-[main] INFO Part01CreateObservable - Subscribing 1st subscriber
-[main] INFO Part01CreateObservable - Started emitting
-[main] INFO Part01CreateObservable - Emitting 1st event
-[main] INFO Part01CreateObservable - First Subscriber received: 1
-[main] INFO Part01CreateObservable - Emitting 2nd event
-[main] INFO Part01CreateObservable - First Subscriber received: 2
-[main] INFO Part01CreateObservable - =======================
-[main] INFO Part01CreateObservable - Subscribing 2nd subscriber
-[main] INFO Part01CreateObservable - Started emitting
-[main] INFO Part01CreateObservable - Emitting 1st event
-[main] INFO Part01CreateObservable - Second Subscriber received: 1
-[main] INFO Part01CreateObservable - Emitting 2nd event
-[main] INFO Part01CreateObservable - Second Subscriber received: 2
+[main] - Subscribing 1st subscriber
+[main] - Started emitting
+[main] - Emitting 1st event
+[main] - First Subscriber received: 1
+[main] - Emitting 2nd event
+[main] - First Subscriber received: 2
+[main] - =======================
+[main] - Subscribing 2nd subscriber
+[main] - Started emitting
+[main] - Emitting 1st event
+[main] - Second Subscriber received: 1
+[main] - Emitting 2nd event
+[main] - Second Subscriber received: 2
 ```
 
 ### Checking if there are any active subscribers 
