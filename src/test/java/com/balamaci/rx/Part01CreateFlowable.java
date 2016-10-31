@@ -1,7 +1,10 @@
 package com.balamaci.rx;
 
 import com.balamaci.rx.util.Helpers;
+import io.reactivex.BackpressureStrategy;
+import io.reactivex.Flowable;
 import io.reactivex.Observable;
+import io.reactivex.Single;
 import io.reactivex.disposables.Disposable;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -12,32 +15,32 @@ import java.util.concurrent.CompletableFuture;
 /**
  * @author sbalamaci
  */
-public class Part01CreateObservable implements BaseTestObservables {
+public class Part01CreateFlowable implements BaseTestObservables {
 
-    private static final Logger log = LoggerFactory.getLogger(Part01CreateObservable.class);
+    private static final Logger log = LoggerFactory.getLogger(Part01CreateFlowable.class);
 
 
     @Test
     public void just() {
-        Observable<Integer> observable = Observable.just(1, 5, 10);
+        Flowable<Integer> flowable = Flowable.just(1, 5, 10);
 
-        observable.subscribe(
+        flowable.subscribe(
                 val -> log.info("Subscriber received: {}", val));
     }
 
     @Test
     public void range() {
-        Observable<Integer> observable = Observable.range(1, 10);
+        Flowable<Integer> flowable = Flowable.range(1, 10);
 
-        observable.subscribe(
+        flowable.subscribe(
                 val -> log.info("Subscriber received: {}", val));
     }
 
     @Test
     public void fromArray() {
-        Observable<String> observable = Observable.fromArray(new String[]{"red", "green", "blue", "black"});
+        Flowable<String> flowable = Flowable.fromArray(new String[]{"red", "green", "blue", "black"});
 
-        observable.subscribe(
+        flowable.subscribe(
                 val -> log.info("Subscriber received: {}"));
     }
 
@@ -52,28 +55,23 @@ public class Part01CreateObservable implements BaseTestObservables {
                       return "red";
                 });
 
-        Observable<String> observable = Observable.fromFuture(completableFuture);
-        observable.subscribe(val -> log.info("Subscriber received: {}", val));
-
-
-        completableFuture = CompletableFuture.completedFuture("green");
-        observable = Observable.fromFuture(completableFuture);
-        observable.subscribe(val -> log.info("Subscriber2 received: {}", val));
+        Single<String> single = Single.fromFuture(completableFuture);
+        single.subscribe(val -> log.info("Subscriber received: {}", val));
     }
 
 
     /**
-     * Using Observable.create to handle the actual emissions of events with the events like onNext, onCompleted, onError
+     * Using Observable.create to handle the actual emissions of events with the events like onNext, onComplete, onError
      * <p>
-     * When subscribing to the Observable with observable.subscribe() the lambda code inside create() gets executed.
-     * Observable.subscribe can take 3 handlers for each type of event - onNext, onError and onCompleted
+     * When subscribing to the Flowable / Observable with flowable.subscribe(), the lambda code inside create() gets executed.
+     * Observable.subscribe can take 3 handlers for each type of event - onNext, onError and onComplete
      * <p>
      * When using Observable.create you need to be aware of <b>Backpressure</b> and that Observables based on 'create' method
      * are not Backpressure aware {@see Part07BackpressureHandling}.
      */
     @Test
     public void createSimpleObservable() {
-        Observable<Integer> observable = Observable.create(subscriber -> {
+        Flowable<Integer> flowable = Flowable.create(subscriber -> {
             log.info("Started emitting");
 
             log.info("Emitting 1st");
@@ -83,10 +81,10 @@ public class Part01CreateObservable implements BaseTestObservables {
             subscriber.onNext(2);
 
             subscriber.onComplete();
-        });
+        }, BackpressureStrategy.BUFFER);
 
         log.info("Subscribing");
-        Disposable subscription = observable.subscribe(
+        Disposable subscription = flowable.subscribe(
                 val -> log.info("Subscriber received: {}", val),
                 err -> log.error("Subscriber received error", err),
                 () -> log.info("Subscriber got Completed event"));
@@ -120,13 +118,13 @@ public class Part01CreateObservable implements BaseTestObservables {
     }
 
     /**
-     * Observables are lazy meaning that the code inside create() doesn't get executed without subscribing to the Observable
-     * So event if we sleep for a long time inside create() method(to simulate a costly operation),
+     * Observables are lazy, meaning that the code inside create() doesn't get executed without subscribing to the Observable
+     * So even if we sleep for a long time inside create() method(to simulate a costly operation),
      * without subscribing to this Observable the code is not executed and the method returns immediately.
      */
     @Test
-    public void observablesAreLazy() {
-        Observable<Integer> observable = Observable.create(subscriber -> {
+    public void flowablesAreLazy() {
+        Observable<Integer> flowable = Observable.create(subscriber -> {
             log.info("Started emitting but sleeping for 5 secs"); //this is not executed
             Helpers.sleepMillis(5000);
             subscriber.onNext(1);
@@ -141,7 +139,7 @@ public class Part01CreateObservable implements BaseTestObservables {
      */
     @Test
     public void multipleSubscriptionsToSameObservable() {
-        Observable<Integer> observable = Observable.create(subscriber -> {
+        Observable<Integer> flowable = Observable.create(subscriber -> {
             log.info("Started emitting");
 
             log.info("Emitting 1st event");
@@ -154,12 +152,12 @@ public class Part01CreateObservable implements BaseTestObservables {
         });
 
         log.info("Subscribing 1st subscriber");
-        observable.subscribe(val -> log.info("First Subscriber received: {}", val));
+        flowable.subscribe(val -> log.info("First Subscriber received: {}", val));
 
         log.info("=======================");
 
         log.info("Subscribing 2nd subscriber");
-        observable.subscribe(val -> log.info("Second Subscriber received: {}", val));
+        flowable.subscribe(val -> log.info("Second Subscriber received: {}", val));
     }
 
     /**
@@ -171,7 +169,7 @@ public class Part01CreateObservable implements BaseTestObservables {
      */
     @Test
     public void showUnsubscribeObservable() {
-        Observable<Integer> observable = Observable.create(subscriber -> {
+        Observable<Integer> flowable = Observable.create(subscriber -> {
 
             int i = 1;
             while(true) {
@@ -184,7 +182,7 @@ public class Part01CreateObservable implements BaseTestObservables {
             //subscriber.onCompleted(); too late to emit Complete event since subscriber already unsubscribed
         });
 
-        observable
+        flowable
                 .take(5)
                 .subscribe(
                         val -> log.info("Subscriber received: {}", val),
@@ -201,7 +199,7 @@ public class Part01CreateObservable implements BaseTestObservables {
     @Test
     public void deferCreateObservable() {
         log.info("Starting");
-        Observable<Long> observable = Observable.defer(() -> {
+        Observable<Long> flowable = Observable.defer(() -> {
             log.info("Computing");
             long value = System.currentTimeMillis();
             return Observable.just(value);
@@ -210,7 +208,7 @@ public class Part01CreateObservable implements BaseTestObservables {
         log.info("Sleeping");
         Helpers.sleepMillis(2000);
 
-        subscribeWithLog(observable);
+        subscribeWithLog(flowable);
     }
 
 }

@@ -1,6 +1,7 @@
 package com.balamaci.rx;
 
-import io.reactivex.Observable;
+import io.reactivex.BackpressureStrategy;
+import io.reactivex.Flowable;
 import org.junit.Test;
 
 import java.util.Random;
@@ -24,7 +25,7 @@ public class Part08ErrorHandling implements BaseTestObservables {
      */
     @Test
     public void errorIsTerminalOperation() {
-        Observable<String> colors = Observable.just("green", "blue", "red", "yellow")
+        Flowable<String> colors = Flowable.just("green", "blue", "red", "yellow")
                 .map(color -> {
                     if ("red".equals(color)) {
                         throw new RuntimeException("Encountered red");
@@ -44,7 +45,7 @@ public class Part08ErrorHandling implements BaseTestObservables {
      */
     @Test
     public void onErrorReturn() {
-        Observable<String> colors = Observable.just("green", "blue", "red", "yellow")
+        Flowable<String> colors = Flowable.just("green", "blue", "red", "yellow")
                 .map(color -> {
                     if ("red".equals(color)) {
                         throw new RuntimeException("Encountered red");
@@ -62,7 +63,7 @@ public class Part08ErrorHandling implements BaseTestObservables {
     public void onErrorReturnWithFlatMap() {
         //flatMap encounters an error when it subscribes to 'red' substreams and thus unsubscribe from
         // 'colors' stream and the remaining colors still are not longer emitted
-        Observable<String> colors = Observable.just("green", "blue", "red", "white", "blue")
+        Flowable<String> colors = Flowable.just("green", "blue", "red", "white", "blue")
                 .flatMap(color -> simulateRemoteOperation(color))
                 .onErrorReturn(throwable -> "-blank-"); //onErrorReturn just has the effect of translating
 
@@ -72,7 +73,7 @@ public class Part08ErrorHandling implements BaseTestObservables {
 
         //bellow onErrorReturn() is applied to the flatMap substream and thus translates the exception to
         //a value and so flatMap continues on with the other colors after red
-        colors = Observable.just("green", "blue", "red", "white", "blue")
+        colors = Flowable.just("green", "blue", "red", "white", "blue")
                 .flatMap(color -> simulateRemoteOperation(color)
                                 .onErrorReturn(throwable -> "-blank-")  //onErrorReturn doesn't trigger
                         // the onError() inside flatMap so it doesn't unsubscribe from 'colors'
@@ -88,11 +89,11 @@ public class Part08ErrorHandling implements BaseTestObservables {
      */
     @Test
     public void onErrorResumeNext() {
-        Observable<String> colors = Observable.just("green", "blue", "red", "white", "blue")
+        Flowable<String> colors = Flowable.just("green", "blue", "red", "white", "blue")
                 .flatMap(color -> simulateRemoteOperation(color)
                         .onErrorResumeNext(th -> {
                             if (th instanceof IllegalArgumentException) {
-                                return Observable.error(new RuntimeException("Fatal, wrong arguments"));
+                                return Flowable.error(new RuntimeException("Fatal, wrong arguments"));
                             }
                             return fallbackRemoteOperation();
                         })
@@ -101,8 +102,8 @@ public class Part08ErrorHandling implements BaseTestObservables {
         subscribeWithLog(colors);
     }
 
-    private Observable<String> fallbackRemoteOperation() {
-        return Observable.just("blank");
+    private Flowable<String> fallbackRemoteOperation() {
+        return Flowable.just("blank");
     }
 
 
@@ -118,11 +119,11 @@ public class Part08ErrorHandling implements BaseTestObservables {
      */
     @Test
     public void timeoutWithRetry() {
-        Observable<String> colors = Observable.just("red", "blue", "green", "yellow")
+        Flowable<String> colors = Flowable.just("red", "blue", "green", "yellow")
                 .concatMap(color -> delayedByLengthEmitter(TimeUnit.SECONDS, color)
                         .timeout(6, TimeUnit.SECONDS)
                         .retry(2)
-                        .onErrorResumeNext(Observable.just("blank"))
+                        .onErrorResumeNext(Flowable.just("blank"))
                 );
 
         subscribeWithLog(colors);
@@ -134,7 +135,7 @@ public class Part08ErrorHandling implements BaseTestObservables {
      */
     @Test
     public void retryBasedOnAttemptsAndExceptionType() {
-        Observable<String> colors = Observable.just("blue", "red", "black", "yellow");
+        Flowable<String> colors = Flowable.just("blue", "red", "black", "yellow");
 
         colors = colors
                 .flatMap(colorName -> simulateRemoteOperation(colorName, 2)
@@ -146,7 +147,7 @@ public class Part08ErrorHandling implements BaseTestObservables {
                             log.info("Retry attempt {} for {}", retryAttempt, colorName);
                             return retryAttempt <= 3;
                         })
-                        .onErrorResumeNext(Observable.just("generic color"))
+                        .onErrorResumeNext(Flowable.just("generic color"))
                 );
 
         subscribeWithLog(colors);
@@ -165,27 +166,26 @@ public class Part08ErrorHandling implements BaseTestObservables {
      */
     @Test
     public void retryWhenUsedForRetryWithBackoff() {
-        Observable<String> colors = Observable.just("blue", "green", "red", "black", "yellow");
+        Flowable<String> colors = Flowable.just("blue", "green", "red", "black", "yellow");
 
         colors = colors.flatMap(colorName ->
                     simulateRemoteOperation(colorName, 3)
                         .retryWhen(exceptionStream -> exceptionStream
-                                .zipWith(Observable.range(1, 3), (exc, attempts) -> {
+                                .zipWith(Flowable.range(1, 3), (exc, attempts) -> {
                                     //don't retry for IllegalArgumentException
                                     if (exc instanceof IllegalArgumentException) {
-                                        return Observable.error(exc);
+                                        return Flowable.error(exc);
                                     }
 
                                     if (attempts < 3) {
                                         log.info("Attempt {}, waiting before retry", attempts);
-                                        return Observable.timer(2 * attempts, TimeUnit.SECONDS);
+                                        return Flowable.timer(2 * attempts, TimeUnit.SECONDS);
                                     }
-                                    return Observable.error(exc);
+                                    return Flowable.error(exc);
                                 })
                                 .flatMap(val -> val)
                         )
-                        .onErrorResumeNext(Observable.just("generic color")
-                        )
+                        .onErrorResumeNext(Flowable.just("generic color"))
         );
 
         subscribeWithLog(colors);
@@ -196,9 +196,9 @@ public class Part08ErrorHandling implements BaseTestObservables {
      */
     @Test
     public void testRepeatWhen() {
-        Observable<Integer> remoteOperation = Observable.defer(() -> {
+        Flowable<Integer> remoteOperation = Flowable.defer(() -> {
             Random random = new Random();
-            return Observable.just(random.nextInt(10));
+            return Flowable.just(random.nextInt(10));
         });
 
         remoteOperation = remoteOperation.repeatWhen(completed -> completed
@@ -208,12 +208,12 @@ public class Part08ErrorHandling implements BaseTestObservables {
         subscribeWithLogWaiting(remoteOperation);
     }
 
-    private Observable<String> simulateRemoteOperation(String color) {
+    private Flowable<String> simulateRemoteOperation(String color) {
         return simulateRemoteOperation(color, Integer.MAX_VALUE);
     }
 
-    private Observable<String> simulateRemoteOperation(String color, int workAfterAttempts) {
-        return Observable.create(subscriber -> {
+    private Flowable<String> simulateRemoteOperation(String color, int workAfterAttempts) {
+        return Flowable.create(subscriber -> {
             AtomicInteger attemptsHolder = attemptsMap.computeIfAbsent(color, (colorKey) -> new AtomicInteger(0));
             int attempts = attemptsHolder.incrementAndGet();
 
@@ -239,7 +239,7 @@ public class Part08ErrorHandling implements BaseTestObservables {
             log.info("Emitting {}", value);
             subscriber.onNext(value);
             subscriber.onComplete();
-        });
+        }, BackpressureStrategy.BUFFER);
     }
 
 

@@ -4,6 +4,8 @@ import com.balamaci.rx.util.Helpers;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.Observable;
+import io.reactivex.Observer;
+import io.reactivex.disposables.Disposable;
 import io.reactivex.schedulers.Schedulers;
 import io.reactivex.subjects.PublishSubject;
 import org.junit.Test;
@@ -82,9 +84,9 @@ public class Part09BackpressureHandling implements BaseTestObservables {
     @Test
     public void zipOperatorHasALimit() {
         Observable<Integer> fast = observableWithoutBackpressureSupport();
-        Observable<Long> slowStream = Observable.interval(100, TimeUnit.MILLISECONDS);
+        Flowable<Long> slowStream = Flowable.interval(100, TimeUnit.MILLISECONDS);
 
-        Observable<String> observable = Observable.zip(fast, slowStream,
+        Observable<String> observable = Observable.zip(fast, slowStream.toObservable(),
                 (val1, val2) -> val1 + " " + val2);
 
         subscribeWithSlowSubscriberAndWait(observable);
@@ -92,12 +94,12 @@ public class Part09BackpressureHandling implements BaseTestObservables {
 
     @Test
     public void backpressureAwareObservable() {
-        Observable<Integer> observable = Observable.range(0, 200);
+        Flowable<Integer> flowable = Flowable.range(0, 200);
 
-        observable = observable
+        flowable = flowable
                 .observeOn(Schedulers.io());
 
-        subscribeWithSlowSubscriberAndWait(observable);
+        subscribeWithSlowSubscriberAndWait(flowable);
     }
 
     // Handling
@@ -131,7 +133,15 @@ public class Part09BackpressureHandling implements BaseTestObservables {
     private void subscribeWithSlowSubscriberAndWait(Observable observable) {
         CountDownLatch latch = new CountDownLatch(1);
 
-        observable.subscribe(val -> {
+        observable.subscribe(observer(latch));
+
+        Helpers.wait(latch);
+    }
+
+    private void subscribeWithSlowSubscriberAndWait(Flowable flowable) {
+        CountDownLatch latch = new CountDownLatch(1);
+
+        flowable.subscribe(val -> {
                     log.info("Got {}", val);
                     Helpers.sleepMillis(50);
                 },
@@ -148,18 +158,34 @@ public class Part09BackpressureHandling implements BaseTestObservables {
     }
 
     private void subscribeWithSlowSubscriber(Observable observable, CountDownLatch latch) {
-        observable.subscribe(val -> {
-                    log.info("Got {}", val);
-                    Helpers.sleepMillis(50);
-                },
-                err -> {
-                    log.error("Subscriber got error", (Throwable) err);
-                    latch.countDown();
-                },
-                () -> {
-                    log.info("Completed");
-                    latch.countDown();
-                });
+        observable.subscribe(observer(latch));
     }
+
+    private Observer observer(CountDownLatch latch) {
+        return new Observer() {
+            @Override
+            public void onSubscribe(Disposable d) {
+            }
+
+            @Override
+            public void onNext(Object value) {
+                log.info("Got {}", value);
+                Helpers.sleepMillis(50);
+            }
+
+            @Override
+            public void onError(Throwable err) {
+                log.error("Subscriber got error", err);
+                latch.countDown();
+            }
+
+            @Override
+            public void onComplete() {
+                log.info("Completed");
+                latch.countDown();
+            }
+        };
+    }
+
 
 }

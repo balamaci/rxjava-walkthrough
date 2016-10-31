@@ -1,7 +1,8 @@
 package com.balamaci.rx;
 
+import io.reactivex.Flowable;
 import io.reactivex.Observable;
-import io.reactivex.observables.GroupedObservable;
+import io.reactivex.flowables.GroupedFlowable;
 import javafx.util.Pair;
 import org.junit.Test;
 
@@ -15,9 +16,9 @@ public class Part05AdvancedOperators implements BaseTestObservables {
 
     @Test
     public void buffer() {
-        Observable<Long> numbers = Observable.interval(1, TimeUnit.SECONDS);
+        Flowable<Long> numbers = Flowable.interval(1, TimeUnit.SECONDS);
 
-        Observable<List<Long>> delayedNumbersWindow = numbers
+        Flowable<List<Long>> delayedNumbersWindow = numbers
                 .buffer(5);
 
         subscribeWithLog(delayedNumbersWindow);
@@ -25,9 +26,9 @@ public class Part05AdvancedOperators implements BaseTestObservables {
 
     @Test
     public void simpleWindow() {
-        Observable<Long> numbers = Observable.interval(1, TimeUnit.SECONDS);
+        Flowable<Long> numbers = Flowable.interval(1, TimeUnit.SECONDS);
 
-        Observable<Long> delayedNumbersWindow = numbers
+        Flowable<Long> delayedNumbersWindow = numbers
                 .window(5)
                 .flatMap(window -> window.doOnComplete(() -> log.info("Window completed")));
 
@@ -37,9 +38,9 @@ public class Part05AdvancedOperators implements BaseTestObservables {
 
     @Test
     public void window() {
-        Observable<Long> numbers = Observable.interval(1, TimeUnit.SECONDS);
+        Flowable<Long> numbers = Flowable.interval(1, TimeUnit.SECONDS);
 
-        Observable<Long> delayedNumbersWindow = numbers
+        Flowable<Long> delayedNumbersWindow = numbers
                 .window(10, 5, TimeUnit.SECONDS)
                 .flatMap(window -> window.doOnComplete(() -> log.info("Window completed")));
 
@@ -52,17 +53,18 @@ public class Part05AdvancedOperators implements BaseTestObservables {
      */
     @Test
     public void groupBy() {
-        Observable<String> colors = Observable.fromArray("red", "green", "blue",
+        Flowable<String> colors = Flowable.fromArray("red", "green", "blue",
                 "red", "yellow", "green", "green");
 
-        Observable<GroupedObservable<String, String>> groupedColorsStream = colors
+        Flowable<GroupedFlowable<String, String>> groupedColorsStream = colors
                 .groupBy(val -> val); //identity function
 //                .groupBy(val -> "length" + val.length());
 
-        Observable<Pair<String, Long>> colorCountStream = groupedColorsStream
+        Flowable<Pair<String, Long>> colorCountStream = groupedColorsStream
                 .flatMap(groupedColor -> groupedColor
                                             .count()
                                             .map(count -> new Pair<>(groupedColor.getKey(), count))
+                                            .toFlowable()
                 );
 
         subscribeWithLog(colorCountStream);

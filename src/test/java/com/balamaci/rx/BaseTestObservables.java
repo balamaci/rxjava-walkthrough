@@ -1,6 +1,8 @@
 package com.balamaci.rx;
 
 import com.balamaci.rx.util.Helpers;
+import io.reactivex.BackpressureStrategy;
+import io.reactivex.Flowable;
 import io.reactivex.Observable;
 import io.reactivex.Single;
 import io.reactivex.functions.Action;
@@ -18,8 +20,8 @@ public interface BaseTestObservables {
 
     Logger log = LoggerFactory.getLogger(BaseTestObservables.class);
 
-    default Observable<Integer> simpleObservable() {
-        Observable<Integer> observable = Observable.create(subscriber -> {
+    default Flowable<Integer> simpleFlowable() {
+        return Flowable.create(subscriber -> {
             log.info("Started emitting");
 
             log.info("Emitting 1st");
@@ -29,9 +31,15 @@ public interface BaseTestObservables {
             subscriber.onNext(2);
 
             subscriber.onComplete();
-        });
+        }, BackpressureStrategy.BUFFER);
+    }
 
-        return observable;
+    default <T> void subscribeWithLog(Flowable<T> flowable) {
+        flowable.subscribe(
+                val -> log.info("Subscriber received: {}", val),
+                logError(),
+                logComplete()
+        );
     }
 
     default <T> void subscribeWithLog(Observable<T> observable) {
@@ -49,10 +57,10 @@ public interface BaseTestObservables {
         );
     }
 
-    default <T> void subscribeWithLogWaiting(Observable<T> observable) {
+    default <T> void subscribeWithLogWaiting(Flowable<T> flowable) {
         CountDownLatch latch = new CountDownLatch(1);
 
-        observable.subscribe(
+        flowable.subscribe(
                 val -> log.info("Subscriber received: {}", val),
                 logError(latch),
                 logComplete(latch)
@@ -61,17 +69,30 @@ public interface BaseTestObservables {
         Helpers.wait(latch);
     }
 
+    default <T> void subscribeWithLogWaiting(Single<T> single) {
+        CountDownLatch latch = new CountDownLatch(1);
 
-    default  <T> Observable<T> periodicEmitter(T t1, T t2, T t3, int interval, TimeUnit unit) {
+        single.subscribe(
+                val -> {
+                    log.info("Subscriber received: {} and completed", val);
+                    latch.countDown();
+                },
+                logError(latch)
+        );
+
+        Helpers.wait(latch);
+    }
+
+    default  <T> Flowable<T> periodicEmitter(T t1, T t2, T t3, int interval, TimeUnit unit) {
         return periodicEmitter(t1, t2, t3, interval, unit, interval);
     }
 
-    default  <T> Observable<T> periodicEmitter(T t1, T t2, T t3, int interval,
+    default  <T> Flowable<T> periodicEmitter(T t1, T t2, T t3, int interval,
                                                TimeUnit unit, int initialDelay) {
-        Observable<T> itemsStream = Observable.just(t1, t2, t3);
-        Observable<Long> timer = Observable.interval(initialDelay, interval, unit);
+        Flowable<T> itemsStream = Flowable.just(t1, t2, t3);
+        Flowable<Long> timer = Flowable.interval(initialDelay, interval, unit);
 
-        return Observable.zip(itemsStream, timer, (key, val) -> key);
+        return Flowable.zip(itemsStream, timer, (key, val) -> key);
     }
 
     default  <T> Observable<T> periodicEmitter(T[] items, int interval,
@@ -87,10 +108,10 @@ public interface BaseTestObservables {
         return periodicEmitter(items, interval, unit);
     }
 
-    default  Observable<String> delayedByLengthEmitter(TimeUnit unit, String...items) {
-        Observable<String> itemsStream = Observable.fromArray(items);
+    default  Flowable<String> delayedByLengthEmitter(TimeUnit unit, String...items) {
+        Flowable<String> itemsStream = Flowable.fromArray(items);
 
-        return itemsStream.concatMap(item -> Observable.just(item)
+        return itemsStream.concatMap(item -> Flowable.just(item)
                         .doOnNext(val -> log.info("Received {} delaying for {} ", val, val.length()))
                         .delay(item.length(), unit)
                 );

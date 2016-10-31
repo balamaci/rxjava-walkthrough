@@ -1,5 +1,6 @@
 package com.balamaci.rx;
 
+import io.reactivex.Flowable;
 import io.reactivex.Observable;
 import io.reactivex.Single;
 import org.junit.Test;
@@ -31,7 +32,7 @@ public class Part02SimpleOperators implements BaseTestObservables {
      */
     @Test
     public void delayOperator() {
-        Observable.range(0, 5)
+        Flowable.range(0, 5)
                 .delay(5, TimeUnit.SECONDS)
                 .subscribe(
                         tick -> log.info("Tick {}", tick),
@@ -47,15 +48,15 @@ public class Part02SimpleOperators implements BaseTestObservables {
     @Test
     public void timerOperator() {
         log.info("Starting");
-        Observable observable = Observable.timer(5, TimeUnit.SECONDS);
+        Flowable observable = Flowable.timer(5, TimeUnit.SECONDS);
         subscribeWithLogWaiting(observable);
     }
 
 
     @Test
     public void delayOperatorWithVariableDelay() {
-        Observable.range(0, 5)
-                .delay(val -> Observable.timer(val * 2, TimeUnit.SECONDS))
+        Flowable.range(0, 5)
+                .delay(val -> Flowable.timer(val * 2, TimeUnit.SECONDS))
                 .subscribe(
                         tick -> log.info("Tick {}", tick),
                         (ex) -> log.info("Error emitted"),
@@ -84,7 +85,7 @@ public class Part02SimpleOperators implements BaseTestObservables {
      */
     @Test
     public void scanOperator() {
-        Observable<Integer> numbers = Observable.just(3, 5, -2, 9)
+        Flowable<Integer> numbers = Flowable.just(3, 5, -2, 9)
                 .scan(0, (totalSoFar, currentValue) -> {
                     log.info("totalSoFar={}, emitted={}", totalSoFar, currentValue);
                     return totalSoFar + currentValue;
@@ -99,7 +100,7 @@ public class Part02SimpleOperators implements BaseTestObservables {
      */
     @Test
     public void reduceOperator() {
-        Single<Integer> numbers = Observable.just(3, 5, -2, 9)
+        Single<Integer> numbers = Flowable.just(3, 5, -2, 9)
                 .reduce(0, (totalSoFar, val) -> {
                     log.info("totalSoFar={}, emitted={}", totalSoFar, val);
                     return totalSoFar + val;
@@ -115,7 +116,7 @@ public class Part02SimpleOperators implements BaseTestObservables {
      */
     @Test
     public void collectOperator() {
-        Single<List<Integer>> numbers = Observable.just(3, 5, -2, 9)
+        Single<List<Integer>> numbers = Flowable.just(3, 5, -2, 9)
                 .collect(ArrayList::new, (container, value) -> {
                     log.info("Adding {} to container", value);
                     container.add(value);
@@ -129,9 +130,9 @@ public class Part02SimpleOperators implements BaseTestObservables {
      */
     @Test
     public void repeat() {
-        Observable random = Observable.defer(() -> {
+        Flowable random = Flowable.defer(() -> {
                                 Random rand = new Random();
-                                return Observable.just(rand.nextInt(20));
+                                return Flowable.just(rand.nextInt(20));
                             })
                             .repeat(5);
 

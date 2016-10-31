@@ -1,11 +1,13 @@
 package com.balamaci.rx;
 
 import com.balamaci.rx.util.Helpers;
-import io.reactivex.Observable;
-import io.reactivex.observables.GroupedObservable;
+import io.reactivex.BackpressureStrategy;
+import io.reactivex.Flowable;
+import io.reactivex.flowables.GroupedFlowable;
 import io.reactivex.schedulers.Schedulers;
 import javafx.util.Pair;
 import org.junit.Test;
+import org.reactivestreams.Publisher;
 
 import java.util.concurrent.TimeUnit;
 
@@ -34,7 +36,7 @@ public class Part06FlatMapOperator implements BaseTestObservables {
      */
     @Test
     public void flatMap() {
-        Observable<String> colors = Observable.just("orange", "red", "green")
+        Flowable<String> colors = Flowable.just("orange", "red", "green")
                 .flatMap(colorName -> simulateRemoteOperation(colorName));
 
         subscribeWithLogWaiting(colors);
@@ -45,16 +47,17 @@ public class Part06FlatMapOperator implements BaseTestObservables {
      */
     @Test
     public void flatMapSubstreamOperations() {
-        Observable<String> colors = Observable.just("orange", "red", "green", "blue");
+        Flowable<String> colors = Flowable.just("orange", "red", "green", "blue");
 
-        Observable<Pair<String, Long>> colorsCounted = colors
+        Flowable<Pair<String, Long>> colorsCounted = colors
                 .flatMap(colorName -> {
-                    Observable<Long> timer = Observable.interval(2, TimeUnit.SECONDS);
+                    Flowable<Long> timer = Flowable.interval(2, TimeUnit.SECONDS);
 
                     return simulateRemoteOperation(colorName) // <- Still a stream
                                     .zipWith(timer, (val, timerVal) -> val)
                                     .count()
-                                    .map(counter -> new Pair<>(colorName, counter));
+                                    .map(counter -> new Pair<>(colorName, counter))
+                                    .toFlowable();
                     }
                 );
 
@@ -70,7 +73,7 @@ public class Part06FlatMapOperator implements BaseTestObservables {
      */
     @Test
     public void flatMapConcurrency() {
-        Observable<String> colors = Observable.just("orange", "red", "green")
+        Flowable<String> colors = Flowable.just("orange", "red", "green")
                 .flatMap(val -> simulateRemoteOperation(val), 1);
 
         subscribeWithLog(colors);
@@ -85,7 +88,7 @@ public class Part06FlatMapOperator implements BaseTestObservables {
      */
     @Test
     public void concatMap() {
-        Observable<String> colors = Observable.just("orange", "red", "green", "blue")
+        Flowable<String> colors = Flowable.just("orange", "red", "green", "blue")
                 .subscribeOn(Schedulers.io())
                 .concatMap(val -> simulateRemoteOperation(val));
 
@@ -97,18 +100,21 @@ public class Part06FlatMapOperator implements BaseTestObservables {
      */
     @Test
     public void flatMapFor() {
-        Observable<String> colors = Observable.fromArray("red", "green", "blue",
+        Flowable<String> colors = Flowable.fromArray("red", "green", "blue",
                 "red", "yellow", "green", "green");
 
-        Observable<GroupedObservable<String, String>> groupedColorsStream = colors
-                                                                                .groupBy(val -> val);//grouping key
-                                                                                // is the String itself, the color
+        Flowable<GroupedFlowable<String, String>> groupedColorsStream = colors
+                                                                           .groupBy(val -> val);//grouping key
+                                                                           // is the String itself, the color
 
-        Observable<Pair<String, Integer>> countedColors = groupedColorsStream.flatMap(groupedObservable
-                                        -> groupedObservable
-                                                .count()
-                                                .map(countVal -> new Pair<>(groupedObservable.getKey(), countVal))
-                            );
+        Flowable<Pair<String, Long>>
+                countedColors = groupedColorsStream
+                                        .flatMap(groupedFlow -> groupedFlow
+                                                                    .count()
+                                                                    .map(countVal -> new Pair<>(groupedFlow.getKey(), countVal))
+                                                                    .toFlowable()
+                                        );
+
         subscribeWithLogWaiting(countedColors);
     }
 
@@ -117,8 +123,8 @@ public class Part06FlatMapOperator implements BaseTestObservables {
      * @param color color
      * @return
      */
-    private Observable<String> simulateRemoteOperation(String color) {
-        return Observable.<String>create(subscriber -> {
+    private Flowable<String> simulateRemoteOperation(String color) {
+        return Flowable.<String>create(subscriber -> {
             Runnable asyncRun = () -> {
                 for (int i = 0; i < color.length(); i++) {
                     subscriber.onNext(color + i);
@@ -128,7 +134,7 @@ public class Part06FlatMapOperator implements BaseTestObservables {
                 subscriber.onComplete();
             };
             new Thread(asyncRun).start();
-        });
+        }, BackpressureStrategy.BUFFER);
     }
 
 }

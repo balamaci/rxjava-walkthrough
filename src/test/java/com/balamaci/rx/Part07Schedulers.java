@@ -1,7 +1,9 @@
 package com.balamaci.rx;
 
 import com.balamaci.rx.util.Helpers;
-import io.reactivex.Observable;
+import io.reactivex.BackpressureStrategy;
+import io.reactivex.Flowable;
+import io.reactivex.Single;
 import io.reactivex.schedulers.Schedulers;
 import org.junit.Test;
 
@@ -37,7 +39,7 @@ public class Part07Schedulers implements BaseTestObservables {
     public void testSubscribeOn() {
         log.info("Starting");
 
-        Observable<Integer> observable = Observable.create(subscriber -> { //code that will execute inside the IO ThreadPool
+        Flowable<Integer> observable = Flowable.create(subscriber -> { //code that will execute inside the IO ThreadPool
             log.info("Starting slow network op");
             Helpers.sleepMillis(2000);
 
@@ -45,7 +47,7 @@ public class Part07Schedulers implements BaseTestObservables {
             subscriber.onNext(1);
 
             subscriber.onComplete();
-        });
+        }, BackpressureStrategy.BUFFER);
         observable = observable.subscribeOn(Schedulers.io()) //Specify execution on the IO Scheduler
                 .map(val -> {
                     int newValue = val * 2;
@@ -66,7 +68,7 @@ public class Part07Schedulers implements BaseTestObservables {
     public void testObserveOn() {
         log.info("Starting");
 
-        Observable<Integer> observable = simpleObservable()
+        Flowable<Integer> observable = simpleFlowable()
                 .subscribeOn(Schedulers.io())
                 .observeOn(Schedulers.computation())
                 .map(val -> {
@@ -87,7 +89,7 @@ public class Part07Schedulers implements BaseTestObservables {
     public void multipleCallsToSubscribeOn() {
         log.info("Starting");
 
-        Observable<Integer> observable = simpleObservable()
+        Flowable<Integer> observable = simpleFlowable()
                 .subscribeOn(Schedulers.io())
                 .subscribeOn(Schedulers.computation())
                 .map(val -> {
@@ -104,7 +106,7 @@ public class Part07Schedulers implements BaseTestObservables {
      */
     @Test
     public void flatMapSubscribesToSubstream() {
-        Observable<String> observable = simpleObservable()
+        Flowable<String> observable = simpleFlowable()
                 .observeOn(Schedulers.io())
                 .map(val -> {
                     log.info("Multiplying ..");
@@ -116,12 +118,11 @@ public class Part07Schedulers implements BaseTestObservables {
         subscribeWithLogWaiting(observable);
     }
 
-    private Observable<String> simulateRemoteOp(Integer val) {
-        return Observable.create(subscriber -> {
+    private Flowable<String> simulateRemoteOp(Integer val) {
+        return Single.<String>create(subscriber -> {
             log.info("Simulate remote call {}", val);
-            subscriber.onNext("***" + val + "***");
-            subscriber.onComplete();
-        });
+            subscriber.onSuccess("***" + val + "***");
+        }).toFlowable();
     }
 
 }

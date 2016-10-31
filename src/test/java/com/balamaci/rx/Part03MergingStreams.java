@@ -1,7 +1,8 @@
 package com.balamaci.rx;
 
 import com.balamaci.rx.util.Helpers;
-import io.reactivex.Observable;
+import io.reactivex.Flowable;
+import io.reactivex.Single;
 import javafx.util.Pair;
 import org.junit.Test;
 
@@ -28,16 +29,16 @@ public class Part03MergingStreams implements BaseTestObservables {
      */
     @Test
     public void zipUsedForTakingTheResultOfCombinedAsyncOperations() {
-        Observable<Boolean> isUserBlockedStream = Observable.fromFuture(CompletableFuture.supplyAsync(() -> {
+        Single<Boolean> isUserBlockedStream = Single.fromFuture(CompletableFuture.supplyAsync(() -> {
             Helpers.sleepMillis(200);
             return Boolean.FALSE;
         }));
-        Observable<Integer> userCreditScoreStream = Observable.fromFuture(CompletableFuture.supplyAsync(() -> {
+        Single<Integer> userCreditScoreStream = Single.fromFuture(CompletableFuture.supplyAsync(() -> {
             Helpers.sleepMillis(2300);
             return 200;
         }));
 
-        Observable<Pair<Boolean, Integer>> userCheckStream = Observable.zip(isUserBlockedStream, userCreditScoreStream,
+        Single<Pair<Boolean, Integer>> userCheckStream = Single.zip(isUserBlockedStream, userCreditScoreStream,
                 (blocked, creditScore) -> new Pair<>(blocked, creditScore));
         subscribeWithLogWaiting(userCheckStream);
 
@@ -50,10 +51,10 @@ public class Part03MergingStreams implements BaseTestObservables {
      */
     @Test
     public void zipUsedToSlowDownAnotherStream() {
-        Observable<String> colors = Observable.just("red", "green", "blue");
-        Observable<Long> timer = Observable.interval(2, TimeUnit.SECONDS);
+        Flowable<String> colors = Flowable.just("red", "green", "blue");
+        Flowable<Long> timer = Flowable.interval(2, TimeUnit.SECONDS);
 
-        Observable<String> periodicEmitter = Observable.zip(colors, timer, (key, val) -> key);
+        Flowable<String> periodicEmitter = Flowable.zip(colors, timer, (key, val) -> key);
 
         subscribeWithLogWaiting(periodicEmitter);
     }
@@ -70,12 +71,12 @@ public class Part03MergingStreams implements BaseTestObservables {
     public void mergeOperator() {
         log.info("Starting");
 
-        Observable<String> colors = periodicEmitter("red", "green", "blue", 2, TimeUnit.SECONDS);
+        Flowable<String> colors = periodicEmitter("red", "green", "blue", 2, TimeUnit.SECONDS);
 
-        Observable<Long> numbers = Observable.interval(1, TimeUnit.SECONDS)
+        Flowable<Long> numbers = Flowable.interval(1, TimeUnit.SECONDS)
                 .take(5);
 
-        Observable observable = Observable.merge(colors, numbers);
+        Flowable observable = Flowable.merge(colors, numbers);
         subscribeWithLog(observable);
     }
 
@@ -90,12 +91,12 @@ public class Part03MergingStreams implements BaseTestObservables {
     @Test
     public void concatStreams() {
         log.info("Starting");
-        Observable<String> colors = periodicEmitter("red", "green", "blue", 2, TimeUnit.SECONDS);
+        Flowable<String> colors = periodicEmitter("red", "green", "blue", 2, TimeUnit.SECONDS);
 
-        Observable<Long> numbers = Observable.interval(1, TimeUnit.SECONDS)
+        Flowable<Long> numbers = Flowable.interval(1, TimeUnit.SECONDS)
                 .take(4);
 
-        Observable observable = Observable.concat(colors, numbers);
+        Flowable observable = Flowable.concat(colors, numbers);
         subscribeWithLog(observable);
     }
 
@@ -107,10 +108,10 @@ public class Part03MergingStreams implements BaseTestObservables {
     public void combineLatest() {
         log.info("Starting");
 
-        Observable<String> colors = periodicEmitter("red", "green", "blue", 3, TimeUnit.SECONDS);
-        Observable<Long> numbers = Observable.interval(1, TimeUnit.SECONDS)
+        Flowable<String> colors = periodicEmitter("red", "green", "blue", 3, TimeUnit.SECONDS);
+        Flowable<Long> numbers = Flowable.interval(1, TimeUnit.SECONDS)
                 .take(4);
-        Observable observable = Observable.combineLatest(colors, numbers, Pair::new);
+        Flowable observable = Flowable.combineLatest(colors, numbers, Pair::new);
 
         subscribeWithLogWaiting(observable);
     }

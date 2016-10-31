@@ -10,8 +10,8 @@
    - [Error Handling](#error-handling)
 
 
-## Observable
-Code is available at [Part01CreateObservable.java](https://github.com/balamaci/rxjava-playground/blob/master/src/test/java/com/balamaci/rx/Part01CreateObservable.java)
+## Flowable, 
+Code is available at [Part01CreateFlowable.java](https://github.com/balamaci/rxjava-playground/blob/master/src/test/java/com/balamaci/rx/Part01CreateFlowable.java)
 
 ### Simple operators to create Observables
 
