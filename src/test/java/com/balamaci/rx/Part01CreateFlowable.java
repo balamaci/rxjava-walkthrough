@@ -7,17 +7,15 @@ import io.reactivex.Observable;
 import io.reactivex.Single;
 import io.reactivex.disposables.Disposable;
 import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.CompletableFuture;
 
 /**
+ *
+ *
  * @author sbalamaci
  */
 public class Part01CreateFlowable implements BaseTestObservables {
-
-    private static final Logger log = LoggerFactory.getLogger(Part01CreateFlowable.class);
 
 
     @Test
@@ -44,6 +42,8 @@ public class Part01CreateFlowable implements BaseTestObservables {
                 val -> log.info("Subscriber received: {}"));
     }
 
+
+
     /**
      * We can also create an Observable from Future, making easier to switch from legacy code to reactive
      */
@@ -67,7 +67,7 @@ public class Part01CreateFlowable implements BaseTestObservables {
      * Observable.subscribe can take 3 handlers for each type of event - onNext, onError and onComplete
      * <p>
      * When using Observable.create you need to be aware of <b>Backpressure</b> and that Observables based on 'create' method
-     * are not Backpressure aware {@see Part07BackpressureHandling}.
+     * are not Backpressure aware {@see Part09BackpressureHandling}.
      */
     @Test
     public void createSimpleObservable() {
@@ -198,17 +198,26 @@ public class Part01CreateFlowable implements BaseTestObservables {
      */
     @Test
     public void deferCreateObservable() {
-        log.info("Starting");
-        Observable<Long> flowable = Observable.defer(() -> {
-            log.info("Computing");
-            long value = System.currentTimeMillis();
-            return Observable.just(value);
-        });
+        log.info("Starting blocking observable");
+        Observable<String> streamBlocked = Observable.just((blockingOperation()));
+        log.info("After blocking observable");
 
-        log.info("Sleeping");
+        log.info("Starting defered op");
+        Observable<String> stream = Observable.defer(() -> Observable.just(blockingOperation()));
+        log.info("After defered op");
+
+        log.info("Sleeping to wait for the async observable to finish");
         Helpers.sleepMillis(2000);
 
-        subscribeWithLog(flowable);
+        subscribeWithLog(stream);
+    }
+
+    private String blockingOperation() {
+        log.info("Blocking...");
+        Helpers.sleepMillis(1000);
+        log.info("Ended blocking");
+
+        return "Hello";
     }
 
 }

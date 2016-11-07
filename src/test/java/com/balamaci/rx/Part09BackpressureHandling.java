@@ -9,8 +9,6 @@ import io.reactivex.disposables.Disposable;
 import io.reactivex.schedulers.Schedulers;
 import io.reactivex.subjects.PublishSubject;
 import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -26,8 +24,6 @@ import java.util.concurrent.TimeUnit;
  */
 public class Part09BackpressureHandling implements BaseTestObservables {
 
-    private static final Logger log = LoggerFactory.getLogger(Part09BackpressureHandling.class);
-
     /**
      * Not being backpressure aware
      */
@@ -37,6 +33,7 @@ public class Part09BackpressureHandling implements BaseTestObservables {
 
         observable = observable
                 .observeOn(Schedulers.io());
+
         subscribeWithSlowSubscriberAndWait(observable);
     }
 
@@ -68,12 +65,14 @@ public class Part09BackpressureHandling implements BaseTestObservables {
 
         Observable<Integer> observable = subject
                 .observeOn(Schedulers.io());
+
         subscribeWithSlowSubscriber(observable, latch);
 
         for (int i = 0; i < 200; i++) {
             log.info("Emitting {}", i);
             subject.onNext(i);
         }
+        subject.onComplete();
 
         Helpers.wait(latch);
     }
@@ -130,20 +129,20 @@ public class Part09BackpressureHandling implements BaseTestObservables {
     }
 
 
-    private void subscribeWithSlowSubscriberAndWait(Observable observable) {
+    private <T> void subscribeWithSlowSubscriberAndWait(Observable<T> observable) {
         CountDownLatch latch = new CountDownLatch(1);
 
-        observable.subscribe(observer(latch));
+        observable.subscribe(slowObserver(latch));
 
         Helpers.wait(latch);
     }
 
-    private void subscribeWithSlowSubscriberAndWait(Flowable flowable) {
+    private <T> void subscribeWithSlowSubscriberAndWait(Flowable<T> flowable) {
         CountDownLatch latch = new CountDownLatch(1);
 
         flowable.subscribe(val -> {
                     log.info("Got {}", val);
-                    Helpers.sleepMillis(50);
+                    Helpers.sleepMillis(100);
                 },
                 err -> {
                     log.error("Subscriber got error", err);
@@ -157,12 +156,12 @@ public class Part09BackpressureHandling implements BaseTestObservables {
         Helpers.wait(latch);
     }
 
-    private void subscribeWithSlowSubscriber(Observable observable, CountDownLatch latch) {
-        observable.subscribe(observer(latch));
+    private <T> void subscribeWithSlowSubscriber(Observable<T> observable, CountDownLatch latch) {
+        observable.subscribe(slowObserver(latch));
     }
 
-    private Observer observer(CountDownLatch latch) {
-        return new Observer() {
+    private <T> Observer<T> slowObserver(CountDownLatch latch) {
+        return new Observer<T>() {
             @Override
             public void onSubscribe(Disposable d) {
             }
@@ -170,7 +169,7 @@ public class Part09BackpressureHandling implements BaseTestObservables {
             @Override
             public void onNext(Object value) {
                 log.info("Got {}", value);
-                Helpers.sleepMillis(50);
+                Helpers.sleepMillis(100);
             }
 
             @Override
