@@ -6,6 +6,7 @@ import io.reactivex.Flowable;
 import io.reactivex.Observable;
 import io.reactivex.Single;
 import io.reactivex.disposables.Disposable;
+import javaslang.collection.List;
 import org.junit.Test;
 
 import java.util.concurrent.CompletableFuture;
@@ -42,9 +43,13 @@ public class Part01CreateFlowable implements BaseTestObservables {
                 val -> log.info("Subscriber received: {}"));
     }
 
-    /**
-     *
-     */
+    @Test
+    public void fromIterable() {
+        Flowable<String> flowable = Flowable.fromIterable(List.of("red", "green", "blue"));
+
+        flowable.subscribe(
+                val -> log.info("Subscriber received: {}"));
+    }
 
     /**
      * We can also create an Observable from Future, making easier to switch from legacy code to reactive
@@ -195,20 +200,25 @@ public class Part01CreateFlowable implements BaseTestObservables {
 
 
     /**
-     * defer acts as a factory of Observables, just when subscribed it actually invokes the logic
-     * to create the Observable to be emitted
+     * .defer acts as a factory of Flows, just when subscribed it actually invokes the logic to create the
+     * Flow to be emitted.
+     * It's a good way to switch from a blocking method to a Single/Flowable.
+     * Just using Flux.just(blockingOp()) would still block,
+     * as it would require to resolve the parameter when invoking Flux.just so blockingOp method would still be invoked.
+     *
+     * The solution is to wrap the blockingOp() method inside a lambda that gets passed to .defer(() -> blockingOp())
      */
     @Test
     public void deferCreateObservable() {
         log.info("Starting blocking observable");
-        Observable<String> streamBlocked = Observable.just((blockingOperation()));
+        Flowable<String> flowableBlocked = Flowable.just((blockingOperation()));
         log.info("After blocking observable");
 
         log.info("Starting defered op");
-        Observable<String> stream = Observable.defer(() -> Observable.just(blockingOperation()));
+        Flowable<String> stream = Flowable.defer(() -> Flowable.just(blockingOperation()));
         log.info("After defered op");
 
-        log.info("Sleeping to wait for the async observable to finish");
+        log.info("Sleeping to wait for the non-blocking stream to finish");
         Helpers.sleepMillis(2000);
 
         subscribeWithLog(stream);

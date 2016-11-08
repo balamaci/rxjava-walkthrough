@@ -21,6 +21,8 @@ Code is available at [Part01CreateFlowable.java](https://github.com/balamaci/rxj
 Flowable<Integer> flowable = Flowable.just(1, 5, 10);
 Flowable<Integer> flowable = Flowable.range(1, 10);
 Flowable<String> flowable = Flowable.fromArray(new String[] {"red", "green", "blue", "black"});
+Flowable<String> flowable = Flowable.fromIterable(List.of("red", "green", "blue"));
+
 ```
 
 
@@ -83,6 +85,18 @@ public void observablesAreLazy() {
 }
 ```
 
+In order to switch from a blocking API to a Single/Flowable API, it's not enough to invoke Flowable.just(blockingOp())
+```
+Flowable<String> flowableBlocked = Flowable.just((blockingOp()));
+```
+This is not a solution as to invoke Flowable.just(param), the param value needs to be resolved, therefore blockingOp() is still invoked
+In order to get around this problem, we can use **Flowable.defer(() -> blockingOp())** and wrap the blockingOp() call inside a lambda which 
+will be invoked lazy at subscribe time.
+
+```
+Flowable<String> stream = Flowable.defer(() -> Flowable.just(blockingOperation()));
+```
+
 ### Multiple subscriptions to the same Observable 
 When subscribing to an Observable, the create() method gets executed for each subscription this means that the events 
 inside create are re-emitted to each subscriber. 
@@ -99,7 +113,7 @@ Observable<Integer> observable = Observable.create(subscriber -> {
    log.info("Emitting 2nd event");
    subscriber.onNext(2);
 
-   subscriber.onCompleted();
+   subscriber.onComplete();
 });
 
 log.info("Subscribing 1st subscriber");
@@ -157,8 +171,6 @@ observable
                //is triggered by 'take()' operator
 
 ```
-
-### defer
 
 
 ## Simple Operators
