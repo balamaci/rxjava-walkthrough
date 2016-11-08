@@ -42,7 +42,9 @@ public class Part01CreateFlowable implements BaseTestObservables {
                 val -> log.info("Subscriber received: {}"));
     }
 
-
+    /**
+     *
+     */
 
     /**
      * We can also create an Observable from Future, making easier to switch from legacy code to reactive

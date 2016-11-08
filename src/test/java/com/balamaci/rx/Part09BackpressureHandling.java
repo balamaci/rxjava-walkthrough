@@ -1,11 +1,10 @@
 package com.balamaci.rx;
 
 import com.balamaci.rx.util.Helpers;
+import io.reactivex.BackpressureOverflowStrategy;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.Observable;
-import io.reactivex.Observer;
-import io.reactivex.disposables.Disposable;
 import io.reactivex.schedulers.Schedulers;
 import io.reactivex.subjects.PublishSubject;
 import org.junit.Test;
@@ -18,40 +17,55 @@ import java.util.concurrent.TimeUnit;
  * It can be the case of a slow consumer that cannot keep up.
  * Backpressure relates to a feedback mechanism through which the subscriber can signal
  * to the producer how much data it can consume.
+ *
  * However the producer must be 'backpressure-aware' in order to know how to throttle back.
+ *
+ * If the producer is not 'backpressure-aware', in order to prevent an OutOfMemory due to an unbounded increase of events,
+ * we still can define a BackpressureStrategy to specify how we should deal with piling events.
+ * If we should buffer(BackpressureStrategy.BUFFER) or drop(BackpressureStrategy.DROP, BackpressureStrategy.LATEST)
+ * incoming events.
  *
  * @author sbalamaci
  */
 public class Part09BackpressureHandling implements BaseTestObservables {
 
     /**
-     * Not being backpressure aware
+     * We specify a buffering strategy, however since the buffer is not very large, we
+     * can opt to drop overflowing events.
      */
     @Test
-    public void throwingBackpressureNotSupported() {
-        Observable<Integer> observable = observableWithoutBackpressureSupport();
+    public void bufferingThenDroppingEvents() {
+        Flowable<Integer> flowable = observableWithoutBackpressureSupport()
+                .toFlowable(BackpressureStrategy.BUFFER)
+                .onBackpressureBuffer(30)
+                .onBackpressureDrop(val -> log.info("Dropped {}", val));
 
-        observable = observable
+        //we need to switch threads to not run the producer in the same thread as the subscriber(which waits some time
+        // to simulate a slow subscriber)
+        flowable = flowable
                 .observeOn(Schedulers.io());
 
-        subscribeWithSlowSubscriberAndWait(observable);
+        subscribeWithSlowSubscriberAndWait(flowable);
     }
 
     /**
-     * Not only a slow subscriber triggers backpressure, but also a slow operator
+     * A more complicated
      */
     @Test
     public void throwingBackpressureNotSupportedSlowOperator() {
         Observable<Integer> observable = observableWithoutBackpressureSupport();
 
-        observable = observable
+        Flowable<String> flowable = observable
                 .observeOn(Schedulers.io())
+                .toFlowable(BackpressureStrategy.BUFFER)
+                .onBackpressureBuffer(30, () -> log.info("***************Overflowing"), BackpressureOverflowStrategy.DROP_OLDEST)
+                .onBackpressureDrop(val -> log.info("Dropped {}", val))
                 .map(val -> {
-                    Helpers.sleepMillis(50);
-                    return val * 2;
+//                    Helpers.sleepMillis(1000);
+                    return "*" + val + "*";
                 });
 
-        subscribeWithLog(observable);
+        subscribeWithSlowSubscriberAndWait(flowable);
     }
 
     /**
@@ -63,10 +77,14 @@ public class Part09BackpressureHandling implements BaseTestObservables {
 
         PublishSubject<Integer> subject = PublishSubject.create();
 
-        Observable<Integer> observable = subject
-                .observeOn(Schedulers.io());
+        Flowable<Integer> flowable = subject
+                .toFlowable(BackpressureStrategy.BUFFER)
+                .onBackpressureBuffer(50)
+                .onBackpressureDrop(val -> log.info("Dropped {}", val));
 
-        subscribeWithSlowSubscriber(observable, latch);
+        flowable = flowable.observeOn(Schedulers.io());
+
+        subscribeWithSlowSubscriber(flowable, latch);
 
         for (int i = 0; i < 200; i++) {
             log.info("Emitting {}", i);
@@ -121,6 +139,7 @@ public class Part09BackpressureHandling implements BaseTestObservables {
 
             for (int i = 0; i < 200; i++) {
                 log.info("Emitting {}", i);
+                Helpers.sleepMillis(20);
                 subscriber.onNext(i);
             }
 
@@ -132,59 +151,22 @@ public class Part09BackpressureHandling implements BaseTestObservables {
     private <T> void subscribeWithSlowSubscriberAndWait(Observable<T> observable) {
         CountDownLatch latch = new CountDownLatch(1);
 
-        observable.subscribe(slowObserver(latch));
+        observable.subscribe(logNextAndSlowByMillis(50), logError(), logComplete());
 
         Helpers.wait(latch);
     }
 
     private <T> void subscribeWithSlowSubscriberAndWait(Flowable<T> flowable) {
         CountDownLatch latch = new CountDownLatch(1);
-
-        flowable.subscribe(val -> {
-                    log.info("Got {}", val);
-                    Helpers.sleepMillis(100);
-                },
-                err -> {
-                    log.error("Subscriber got error", err);
-                    latch.countDown();
-                },
-                () -> {
-                    log.info("Completed");
-                    latch.countDown();
-                });
+        flowable.subscribe(logNextAndSlowByMillis(50), logError(latch), logComplete(latch));
 
         Helpers.wait(latch);
     }
 
-    private <T> void subscribeWithSlowSubscriber(Observable<T> observable, CountDownLatch latch) {
-        observable.subscribe(slowObserver(latch));
+    private <T> void subscribeWithSlowSubscriber(Flowable<T> flowable, CountDownLatch latch) {
+        flowable.subscribe(logNextAndSlowByMillis(50), logError(latch), logComplete(latch));
     }
 
-    private <T> Observer<T> slowObserver(CountDownLatch latch) {
-        return new Observer<T>() {
-            @Override
-            public void onSubscribe(Disposable d) {
-            }
-
-            @Override
-            public void onNext(Object value) {
-                log.info("Got {}", value);
-                Helpers.sleepMillis(100);
-            }
-
-            @Override
-            public void onError(Throwable err) {
-                log.error("Subscriber got error", err);
-                latch.countDown();
-            }
-
-            @Override
-            public void onComplete() {
-                log.info("Completed");
-                latch.countDown();
-            }
-        };
-    }
 
 
 }

@@ -36,7 +36,7 @@ public interface BaseTestObservables {
 
     default <T> void subscribeWithLog(Flowable<T> flowable) {
         flowable.subscribe(
-                val -> log.info("Subscriber received: {}", val),
+                logNext(),
                 logError(),
                 logComplete()
         );
@@ -44,7 +44,7 @@ public interface BaseTestObservables {
 
     default <T> void subscribeWithLog(Observable<T> observable) {
         observable.subscribe(
-                val -> log.info("Subscriber received: {}", val),
+                logNext(),
                 logError(),
                 logComplete()
         );
@@ -61,7 +61,7 @@ public interface BaseTestObservables {
         CountDownLatch latch = new CountDownLatch(1);
 
         flowable.subscribe(
-                val -> log.info("Subscriber received: {}", val),
+                logNext(),
                 logError(latch),
                 logComplete(latch)
         );
@@ -115,6 +115,17 @@ public interface BaseTestObservables {
                         .doOnNext(val -> log.info("Received {} delaying for {} ", val, val.length()))
                         .delay(item.length(), unit)
                 );
+    }
+
+    default <T> Consumer<? super T> logNext() {
+        return (Consumer<T>) val -> log.info("Subscriber received: {}", val);
+    }
+
+    default <T> Consumer<? super T> logNextAndSlowByMillis(int millis) {
+        return (Consumer<T>) val -> {
+            log.info("Subscriber received: {}", val);
+            Helpers.sleepMillis(millis);
+        };
     }
 
     default Consumer<? super Throwable> logError() {
