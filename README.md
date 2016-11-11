@@ -1,6 +1,6 @@
 # RxJava 2.x
 
-also available for [reactor-core]() 
+also available for [reactor-core](https://github.com/balamaci/reactor-core-playground) 
 
 ## Contents 
  
@@ -85,16 +85,21 @@ public void observablesAreLazy() {
 }
 ```
 
-In order to switch from a blocking API to a Single/Flowable API, it's not enough to invoke Flowable.just(blockingOp())
+An easy way to switch from a blocking method to a reactive Single/Flowable is to use **.defer(() -> blockingOp())**.
+
+Simply using **Flowable.just(blockingOp())** would still block, as Java needs to resolve the parameter when invoking
+**Flux.just(param)** method, so _blockingOp()_ method would still be invoked(and block).
 ```
-Flowable<String> flowableBlocked = Flowable.just((blockingOp()));
+//NOT OK
+Flowable<String> flowableBlocked = Flowable.just((blockingOp())); //blocks on this line
 ```
-This is not a solution as to invoke Flowable.just(param), the param value needs to be resolved, therefore blockingOp() is still invoked
-In order to get around this problem, we can use **Flowable.defer(() -> blockingOp())** and wrap the blockingOp() call inside a lambda which 
-will be invoked lazy at subscribe time.
+    
+In order to get around this problem, we can use **Flowable.defer(() -> blockingOp())** and wrap the _blockingOp()_ call inside a lambda which 
+will be invoked lazy **at subscribe time**.
 
 ```
-Flowable<String> stream = Flowable.defer(() -> Flowable.just(blockingOperation()));
+Flowable<String> stream = Flowable.defer(() -> Flowable.just(blockingOperation())); 
+stream.subscribe(val -> log.info("Val " + val)); //only now the code inside defer() is executed
 ```
 
 ### Multiple subscriptions to the same Observable 
@@ -146,7 +151,7 @@ will output
 ### Checking if there are any active subscribers 
 Inside the create() method, we can check is there are still active subscribers to our Observable.
 It's a way to prevent to do extra work(like for ex. querying a datasource for entries) if no one is listening
-In the following example we'd expect to have an infinite stream, but because we stop if there are no active subscribers we stop producing events.
+In the following example we'd expect to have an infinite stream, but because we stop if there are no active subscribers, we stop producing events.
 The **take()** operator unsubscribes from the Observable after it's received the specified amount of events.
 
 ```
@@ -154,7 +159,7 @@ Observable<Integer> observable = Observable.create(subscriber -> {
 
     int i = 1;
     while(true) {
-        if(subscriber.isUnsubscribed()) {
+        if(subscriber.isDisposed()) {
              break;
         }
 
@@ -199,8 +204,6 @@ The delay operator uses a [Scheduler](#schedulers) by default, which actually me
 running the operators and the subscribe operations on a different thread and so the test method
 will terminate before we see the text from the log.
 
-To prevent this we use the **.toBlocking()** operator which returns a **BlockingObservable**. Operators on
-**BlockingObservable** block(wait) until upstream Observable is completed
 
 ### scan
 Takes an initial value and a function(accumulator, currentValue). It goes through the events 
