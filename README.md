@@ -185,7 +185,7 @@ Code is available at [Part02SimpleOperators.java](https://github.com/balamaci/rx
 Periodically emits a number starting from 0 and then increasing the value on each emission.
 ```
 log.info("Starting");
-Observable.interval(5, TimeUnit.SECONDS)
+Flowable.interval(5, TimeUnit.SECONDS)
        .take(4)
        .toBlocking()
        .subscribe(tick -> log.info("Tick {}", tick),
@@ -211,8 +211,8 @@ sequence and combines the current event value with the previous result(accumulat
 The initial value is used for the first event
 
 ```
-Observable<Integer> numbers = 
-                Observable.just(3, 5, -2, 9)
+Flowable<Integer> numbers = 
+                Flowable.just(3, 5, -2, 9)
                     .scan(0, (totalSoFar, currentValue) -> {
                                log.info("TotalSoFar={}, currentValue={}", totalSoFar, currentValue);
                                return totalSoFar + currentValue;
@@ -237,7 +237,7 @@ reduce operator acts like the scan operator but it only passes downstream the fi
 (doesn't pass the intermediate results downstream) so the subscriber receives just one event
 
 ```
-Observable<Integer> numbers = Observable.just(3, 5, -2, 9)
+Flowable<Integer> numbers = Flowable.just(3, 5, -2, 9)
                             .reduce(0, (totalSoFar, val) -> {
                                          log.info("totalSoFar={}, emitted={}", totalSoFar, val);
                                          return totalSoFar + val;
@@ -260,7 +260,7 @@ anything(a consumer). The mutable container is passed for every event and thus y
 in this collect consumer function.
 
 ```
-Observable<List<Integer>> numbers = Observable.just(3, 5, -2, 9)
+Flowable<List<Integer>> numbers = Flowable.just(3, 5, -2, 9)
                                         .collect(ArrayList::new, (container, value) -> {
                                             log.info("Adding {} to container", value);
                                             container.add(value);
@@ -298,19 +298,19 @@ Zip operator besides the streams to zip, also takes as parameter a function whic
 combined result of the zipped streams once each stream emitted it's value
 
 ```
-Observable<Boolean> isUserBlockedStream = Observable.
-                                            from(CompletableFuture.supplyAsync(() -> {
-            Helpers.sleepMillis(200);
-            return Boolean.FALSE;
-}));
+Single<Boolean> isUserBlockedStream = 
+                    Single.fromFuture(CompletableFuture.supplyAsync(() -> {
+                            Helpers.sleepMillis(200);
+                            return Boolean.FALSE;
+                    }));
 
-Observable<Integer> userCreditScoreStream = Observable.
-                                            from(CompletableFuture.supplyAsync(() -> {
-            Helpers.sleepMillis(2300);
-            return 5;
-}));
+Single<Integer> userCreditScoreStream = 
+                    Single.fromFuture(CompletableFuture.supplyAsync(() -> {
+                            Helpers.sleepMillis(2300);
+                            return 5;
+                    }));
 
-Observable<Pair<Boolean, Integer>> userCheckStream = Observable.
+Single<Pair<Boolean, Integer>> userCheckStream = Single.
            zip(isUserBlockedStream, userCreditScoreStream, 
                       (blocked, creditScore) -> new Pair<Boolean, Integer>(blocked, creditScore));
 
@@ -322,10 +322,10 @@ to the subscriber.
 
 Another good example of 'zip' is to slow down a stream by another basically **implementing a periodic emitter of events**:
 ```  
-Observable<String> colors = Observable.just("red", "green", "blue");
-Observable<Long> timer = Observable.interval(2, TimeUnit.SECONDS);
+Flowable<String> colors = Flowable.just("red", "green", "blue");
+Flowable<Long> timer = Flowable.interval(2, TimeUnit.SECONDS);
 
-Observable<String> periodicEmitter = Observable.zip(colors, timer, (key, val) -> key);
+Flowable<String> periodicEmitter = Flowable.zip(colors, timer, (key, val) -> key);
 ```
 Since the zip operator needs a pair of events, the slow stream will work like a timer by periodically emitting 
 with zip setting the pace of emissions downstream every 2 seconds.
@@ -337,10 +337,11 @@ Merge operator combines one or more stream and passes events downstream as soon 
 ![merge](https://raw.githubusercontent.com/reactor/projectreactor.io/master/src/main/static/assets/img/marble/merge.png)
 
 ```
-Observable<String> colors = periodicEmitter("red", "green", "blue", 2, TimeUnit.SECONDS);
+Flowable<String> colors = periodicEmitter("red", "green", "blue", 2, TimeUnit.SECONDS);
 
-Observable<Long> numbers = Observable.interval(1, TimeUnit.SECONDS)
+Flowable<Long> numbers = Flowable.interval(1, TimeUnit.SECONDS)
                 .take(5);
+Flowable flowable = Flowable.merge(colors, numbers);                
 ```
 
 ```
@@ -359,12 +360,12 @@ Concat operator appends another streams at the end of another
 ![concat](https://raw.githubusercontent.com/reactor/projectreactor.io/master/src/main/static/assets/img/marble/concat.png)
 
 ```
-Observable<String> colors = periodicEmitter("red", "green", "blue", 2, TimeUnit.SECONDS);
+Flowable<String> colors = periodicEmitter("red", "green", "blue", 2, TimeUnit.SECONDS);
 
-Observable<Long> numbers = Observable.interval(1, TimeUnit.SECONDS)
+Flowable<Long> numbers = Flowable.interval(1, TimeUnit.SECONDS)
                 .take(4);
 
-Observable events = Observable.concat(colors, numbers);
+Flowable events = Flowable.concat(colors, numbers);
 ```
 
 ```
@@ -589,6 +590,9 @@ private Observable<String> simulateRemoteOperation(String color) {
 ### onErrorReturn
 
 The 'onErrorReturn' operator replaces an exception with a value:
+
+
+
 ```
 Observable<String> colors = Observable.just("green", "blue", "red", "white", "blue")
                 .flatMap(color -> simulateRemoteOperation(color))

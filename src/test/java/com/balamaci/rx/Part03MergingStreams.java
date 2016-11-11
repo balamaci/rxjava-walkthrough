@@ -76,8 +76,8 @@ public class Part03MergingStreams implements BaseTestObservables {
         Flowable<Long> numbers = Flowable.interval(1, TimeUnit.SECONDS)
                 .take(5);
 
-        Flowable observable = Flowable.merge(colors, numbers);
-        subscribeWithLog(observable);
+        Flowable flowable = Flowable.merge(colors, numbers);
+        subscribeWithLogWaiting(flowable);
     }
 
     /**
@@ -97,7 +97,7 @@ public class Part03MergingStreams implements BaseTestObservables {
                 .take(4);
 
         Flowable observable = Flowable.concat(colors, numbers);
-        subscribeWithLog(observable);
+        subscribeWithLogWaiting(observable);
     }
 
     /**

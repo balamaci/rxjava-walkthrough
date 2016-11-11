@@ -1,7 +1,6 @@
 package com.balamaci.rx;
 
 import io.reactivex.Flowable;
-import io.reactivex.Observable;
 import io.reactivex.Single;
 import org.junit.Test;
 
@@ -44,8 +43,8 @@ public class Part02SimpleOperators implements BaseTestObservables {
     @Test
     public void timerOperator() {
         log.info("Starting");
-        Flowable observable = Flowable.timer(5, TimeUnit.SECONDS);
-        subscribeWithLogWaiting(observable);
+        Flowable flowable = Flowable.timer(5, TimeUnit.SECONDS);
+        subscribeWithLogWaiting(flowable);
     }
 
 
@@ -65,7 +64,7 @@ public class Part02SimpleOperators implements BaseTestObservables {
     @Test
     public void intervalOperator() {
         log.info("Starting");
-        Observable.interval(1, TimeUnit.SECONDS)
+        Flowable.interval(1, TimeUnit.SECONDS)
                 .take(5)
                 .subscribe(
                         tick -> log.info("Tick {}", tick),
