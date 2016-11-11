@@ -7,6 +7,9 @@ import io.reactivex.Single;
 import io.reactivex.schedulers.Schedulers;
 import org.junit.Test;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 /**
  * RxJava provides some high level concepts for concurrent execution, like ExecutorService we're not dealing
  * with the low level constructs like creating the Threads ourselves. Instead we're using a {@see rx.Scheduler} which create
@@ -102,18 +105,25 @@ public class Part07Schedulers implements BaseTestObservables {
     }
 
     /**
-     * As @see
+     * Controlling concurrency in flatMap
+     *
+     * By using subscribeOn in flatMap you can control the thread on which flapMap subscribes to the particular
+     * stream. By using a scheduler from a custom executor to which we allow a limited number of threads,
+     * we can also control how many concurrent threads are handling stream operations inside the flatMap
      */
     @Test
     public void flatMapSubscribesToSubstream() {
-        Flowable<String> observable = simpleFlowable()
-                .observeOn(Schedulers.io())
+        ExecutorService fixedThreadPool = Executors.newFixedThreadPool(2);
+
+        Flowable<String> observable = Flowable.range(1, 5)
+                .observeOn(Schedulers.io()) //Scheduler for multiply
                 .map(val -> {
-                    log.info("Multiplying ..");
+                    log.info("Multiplying {}", val);
                     return val * 10;
                 })
                 .flatMap(val -> simulateRemoteOp(val)
-                                    .subscribeOn(Schedulers.computation()));
+                                    .subscribeOn(Schedulers.from(fixedThreadPool))
+                );
 
         subscribeWithLogWaiting(observable);
     }
@@ -121,6 +131,7 @@ public class Part07Schedulers implements BaseTestObservables {
     private Flowable<String> simulateRemoteOp(Integer val) {
         return Single.<String>create(subscriber -> {
             log.info("Simulate remote call {}", val);
+            Helpers.sleepMillis(3000);
             subscriber.onSuccess("***" + val + "***");
         }).toFlowable();
     }

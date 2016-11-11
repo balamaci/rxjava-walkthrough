@@ -200,32 +200,35 @@ public class Part01CreateFlowable implements BaseTestObservables {
 
 
     /**
-     * .defer acts as a factory of Flows, just when subscribed it actually invokes the logic to create the
+     * .defer acts as a factory of Flowables, just when subscribed it actually invokes the logic to create the
      * Flow to be emitted.
-     * It's a good way to switch from a blocking method to a Single/Flowable.
-     * Just using Flux.just(blockingOp()) would still block,
-     * as it would require to resolve the parameter when invoking Flux.just so blockingOp method would still be invoked.
+     * It's a good way to switch from a blocking method to a reactive Single/Flowable.
+     *
+     * Simply using Flowable.just(blockingOp()) would still block, as Java needs to resolve the parameter when invoking
+     * Flux.just(param) method, so blockingOp() method would still be invoked(and block).
      *
      * The solution is to wrap the blockingOp() method inside a lambda that gets passed to .defer(() -> blockingOp())
+     *
      */
     @Test
     public void deferCreateObservable() {
-        log.info("Starting blocking observable");
+        log.info("Starting blocking Flowable");
         Flowable<String> flowableBlocked = Flowable.just((blockingOperation()));
-        log.info("After blocking observable");
+        log.info("After blocking Flowable");
 
         log.info("Starting defered op");
         Flowable<String> stream = Flowable.defer(() -> Flowable.just(blockingOperation()));
         log.info("After defered op");
 
-        log.info("Sleeping to wait for the non-blocking stream to finish");
+        log.info("Sleeping a little before subscribing and executing the defered code");
         Helpers.sleepMillis(2000);
 
-        subscribeWithLog(stream);
+        log.info("Subscribing");
+        subscribeWithLogWaiting(stream);
     }
 
     private String blockingOperation() {
-        log.info("Blocking...");
+        log.info("Blocking 1sec...");
         Helpers.sleepMillis(1000);
         log.info("Ended blocking");
 
