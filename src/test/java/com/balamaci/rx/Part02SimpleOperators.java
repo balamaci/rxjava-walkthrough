@@ -22,18 +22,17 @@ public class Part02SimpleOperators implements BaseTestObservables {
      * running the operators and the subscribe operations on a different thread, which means the test method
      * will terminate before we see the text from the log.
      *
-     * To prevent this we use the .toBlocking() operator which returns a BlockingObservable. Operators on
-     * BlockingObservable block(wait) until upstream Observable is completed
      */
     @Test
     public void delayOperator() {
+        log.info("Starting");
         Flowable.range(0, 5)
+                .doOnNext(val -> log.info("Emitted {}", val))
                 .delay(5, TimeUnit.SECONDS)
-                .subscribe(
+                .blockingSubscribe(
                         tick -> log.info("Tick {}", tick),
                         (ex) -> log.info("Error emitted"),
                         () -> log.info("Completed"));
-
 //        Helpers.sleepMillis(10000);
     }
 
@@ -50,12 +49,11 @@ public class Part02SimpleOperators implements BaseTestObservables {
 
     @Test
     public void delayOperatorWithVariableDelay() {
-        Flowable.range(0, 5)
-                .delay(val -> Flowable.timer(val * 2, TimeUnit.SECONDS))
-                .subscribe(
-                        tick -> log.info("Tick {}", tick),
-                        (ex) -> log.info("Error emitted"),
-                        () -> log.info("Completed"));
+        log.info("Starting");
+        Flowable flowable = Flowable.range(0, 5)
+                                    .doOnNext(val -> log.info("Emitted {}", val))
+                                    .delay(val -> Flowable.timer(val * 2, TimeUnit.SECONDS));
+        subscribeWithLogWaiting(flowable);
     }
 
     /**
@@ -64,12 +62,10 @@ public class Part02SimpleOperators implements BaseTestObservables {
     @Test
     public void intervalOperator() {
         log.info("Starting");
-        Flowable.interval(1, TimeUnit.SECONDS)
-                .take(5)
-                .subscribe(
-                        tick -> log.info("Tick {}", tick),
-                        (ex) -> log.info("Error emitted"),
-                        () -> log.info("Completed"));
+        Flowable flowable = Flowable.interval(1, TimeUnit.SECONDS)
+                                    .take(5);
+
+        subscribeWithLogWaiting(flowable);
     }
 
     /**

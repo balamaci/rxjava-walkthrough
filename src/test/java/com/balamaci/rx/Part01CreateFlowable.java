@@ -52,7 +52,7 @@ public class Part01CreateFlowable implements BaseTestObservables {
     }
 
     /**
-     * We can also create an Observable from Future, making easier to switch from legacy code to reactive
+     * We can also create a stream from Future, making easier to switch from legacy code to reactive
      */
     @Test
     public void fromFuture() {
@@ -63,15 +63,16 @@ public class Part01CreateFlowable implements BaseTestObservables {
                 });
 
         Single<String> single = Single.fromFuture(completableFuture);
-        single.subscribe(val -> log.info("Subscriber received: {}", val));
+        single.subscribe(val -> log.info("Stream completed successfully : {}", val));
     }
 
 
+
     /**
-     * Using Observable.create to handle the actual emissions of events with the events like onNext, onComplete, onError
+     * Using Flowable.create to handle the actual emissions of events with the events like onNext, onComplete, onError
      * <p>
      * When subscribing to the Flowable / Observable with flowable.subscribe(), the lambda code inside create() gets executed.
-     * Observable.subscribe can take 3 handlers for each type of event - onNext, onError and onComplete
+     * Flowable.subscribe can take 3 handlers for each type of event - onNext, onError and onComplete
      * <p>
      * When using Observable.create you need to be aware of <b>Backpressure</b> and that Observables based on 'create' method
      * are not Backpressure aware {@see Part09BackpressureHandling}.
@@ -172,11 +173,11 @@ public class Part01CreateFlowable implements BaseTestObservables {
      * It's a way to prevent to do extra work(like for ex. querying a datasource for entries) if no one is listening
      * In the following example we'd expect to have an infinite stream, but because we stop if there are no active
      * subscribers we stop producing events.
-     * The **take()** operator unsubscribes from the Observable after it's received the specified amount of events
+     * The take() operator unsubscribes from the Observable after it's received the specified amount of events
      */
     @Test
     public void showUnsubscribeObservable() {
-        Observable<Integer> flowable = Observable.create(subscriber -> {
+        Observable<Integer> observable = Observable.create(subscriber -> {
 
             int i = 1;
             while(true) {
@@ -189,7 +190,7 @@ public class Part01CreateFlowable implements BaseTestObservables {
             //subscriber.onCompleted(); too late to emit Complete event since subscriber already unsubscribed
         });
 
-        flowable
+        observable
                 .take(5)
                 .subscribe(
                         val -> log.info("Subscriber received: {}", val),

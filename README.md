@@ -10,21 +10,60 @@ also available for [reactor-core](https://github.com/balamaci/reactor-core-playg
    - [FlatMap Operator](#flatmap-operator)
    - [Schedulers](#schedulers)
    - [Error Handling](#error-handling)
+   - [Backpressure](#backpressure)
 
+## Reactive Streams
+Reactive Streams is a programming concept for handling asynchronous 
+data streams in a non-blocking manner while providing backpressure to stream publishers.
+It has evolved into a [specification](https://github.com/reactive-streams/reactive-streams-jvm) that is based on the concept of **Publisher<T>** and **Subscriber<T>**.
+A **Publisher** is the source of events **T** in the stream, and a **Subscriber** is the consumer for those events.
+A **Subscriber** subscribes to a **Publisher** by invoking a "factory method" :
+```
+public interface Publisher<T> {
+    public void subscribe(Subscriber<? super T> s);
+}
+```
+in the Publisher that will push the stream items **<T>** starting a new **Subscription**.  
 
-## Flowable, 
+When the Subscriber is ready to start handling events, it signals this via a **request** to that **Subscription** 
+```
+public interface Subscription {
+    public void request(long n); //request n items
+    public void cancel();
+}
+```
+
+Upon receiving this signal, the Publisher begins to invoke **Subscriber::onNext(T)** for each event **T**. 
+This continues until either completion of the stream (**Subscriber::onComplete()**) 
+or an error occurs during processing (**Subscriber::onError(Throwable)**).
+```
+public interface Subscriber<T> {
+    //signals to the Publisher to start sending events
+    public void onSubscribe(Subscription s);     
+    
+    public void onNext(T t);
+    public void onError(Throwable t);
+    public void onComplete();
+}
+```
+
+## Flowable, Observable
+RxJava provides more types of publishers: 
+   - **Flowable** publisher that emits 0..N elements, and then completes successfully or with an error
+   - **Observable** like Flowables but without a backpressure strategy
+   - **Single** a specialized publisher that completes with a value successfully either an error.(doesn't have onComplete callback, instead onSuccess(val))
+   - **Maybe** a specialized publisher that can complete with / without a value or complete with an error.
+   - **Completable** a specialized publisher that just signals if it completed successfully or with an error.
+
 Code is available at [Part01CreateFlowable.java](https://github.com/balamaci/rxjava-playground/blob/master/src/test/java/com/balamaci/rx/Part01CreateFlowable.java)
 
 ### Simple operators to create Streams
-
 ```
 Flowable<Integer> flowable = Flowable.just(1, 5, 10);
 Flowable<Integer> flowable = Flowable.range(1, 10);
 Flowable<String> flowable = Flowable.fromArray(new String[] {"red", "green", "blue", "black"});
 Flowable<String> flowable = Flowable.fromIterable(List.of("red", "green", "blue"));
-
 ```
-
 
 
 ### Flowable from Future
@@ -38,7 +77,9 @@ CompletableFuture<String> completableFuture = CompletableFuture
             });
 
 Single<String> observable = Single.from(completableFuture);
+single.subscribe(val -> log.info("Stream completed successfully : {}", val));
 ```
+
 
 ### Creating your own stream
 
@@ -103,7 +144,7 @@ stream.subscribe(val -> log.info("Val " + val)); //only now the code inside defe
 ```
 
 ### Multiple subscriptions to the same Observable 
-When subscribing to an Observable, the create() method gets executed for each subscription this means that the events 
+When subscribing to an Observable/Flowable, the create() method gets executed for each subscription this means that the events 
 inside create are re-emitted to each subscriber. 
 
 So every subscriber will get the same events and will not lose any events - this behavior is named **'cold observable'**
@@ -187,7 +228,6 @@ Periodically emits a number starting from 0 and then increasing the value on eac
 log.info("Starting");
 Flowable.interval(5, TimeUnit.SECONDS)
        .take(4)
-       .toBlocking()
        .subscribe(tick -> log.info("Tick {}", tick),
                   (ex) -> log.info("Error emitted"),
                   () -> log.info("Completed"));
@@ -200,7 +240,7 @@ Flowable.interval(5, TimeUnit.SECONDS)
 22:28:04 [main] - Completed
 ```
 
-The delay operator uses a [Scheduler](#schedulers) by default, which actually means it's
+The delay(), interval() operators uses a [Scheduler](#schedulers) by default, which actually means it's
 running the operators and the subscribe operations on a different thread and so the test method
 will terminate before we see the text from the log.
 
@@ -558,11 +598,29 @@ returns:
 23:30:17 [main] INFO - Subscriber received: blue*XXX
 23:30:17 [main] ERROR - Subscriber received error 'Encountered red'
 ```
-After the map() operator encounters an error, it triggers the error handler in the subscriber which also unsubscribes(cancels the subscription) from the stream,
-therefore 'yellow' is not even sent downstream.
+After the map() operator encounters an error it unsubscribes(cancels the subscription) from the stream 
+- therefore 'yellow' is not even emitted-. The error travels downstream and triggers the error handler in the subscriber.
 
 
-However there are operators to deal with error flow control. 
+There are operators to deal with error flow control. 
+### onErrorReturn
+
+The 'onErrorReturn' operator replaces an exception with a value:
+```
+Flowable<Integer> numbers = Flowable.just("1", "3", "a", "4", "5", "c")
+                            .map(Integer::parseInt) 
+                            .onErrorReturn(0);      
+subscribeWithLog(numbers);
+```
+```
+Subscriber received: 1
+Subscriber received: 3
+Subscriber received: 0
+Subscriber got Completed event
+```
+Notice though how it didn't prevent map() operator from unsubscribing from the Flowable, but it did 
+trigger the normal onNext callback instead of onError in the subscriber.
+
 
 Let's introduce a more realcase scenario of a simulated remote request that might fail 
 ```
@@ -586,10 +644,6 @@ private Observable<String> simulateRemoteOperation(String color) {
 }
 ```
 
-
-### onErrorReturn
-
-The 'onErrorReturn' operator replaces an exception with a value:
 
 
 
@@ -786,5 +840,12 @@ With similar names it worth noting the difference.
 Example using repeatWhen() to implement periodic polling
 ```
 remoteOperation.repeatWhen(completed -> completed
-                                         .delay(2, TimeUnit.SECONDS))                                                       
-```   
+                                     .delay(2, TimeUnit.SECONDS))                                                       
+```
+   
+## Backpressure
+
+Backpressure is related to preventing overloading the subscriber with too many events.
+It can be the case of a slow consumer that cannot keep up with the producer.
+
+   

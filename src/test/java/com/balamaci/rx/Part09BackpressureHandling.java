@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Backpressure is related to preventing overloading the subscriber with too many events.
- * It can be the case of a slow consumer that cannot keep up.
+ * It can be the case of a slow consumer that cannot keep up with the producer.
  * Backpressure relates to a feedback mechanism through which the subscriber can signal
  * to the producer how much data it can consume.
  *
@@ -58,7 +58,8 @@ public class Part09BackpressureHandling implements BaseTestObservables {
         Flowable<String> flowable = observable
                 .observeOn(Schedulers.io())
                 .toFlowable(BackpressureStrategy.BUFFER)
-                .onBackpressureBuffer(30, () -> log.info("***************Overflowing"), BackpressureOverflowStrategy.DROP_OLDEST)
+                .onBackpressureBuffer(30, () -> log.info("***************Overflowing"),
+                        BackpressureOverflowStrategy.DROP_OLDEST)
                 .onBackpressureDrop(val -> log.info("Dropped {}", val))
                 .map(val -> {
 //                    Helpers.sleepMillis(1000);
