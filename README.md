@@ -17,13 +17,13 @@ Reactive Streams is a programming concept for handling asynchronous
 data streams in a non-blocking manner while providing backpressure to stream publishers.
 It has evolved into a [specification](https://github.com/reactive-streams/reactive-streams-jvm) that is based on the concept of **Publisher<T>** and **Subscriber<T>**.
 A **Publisher** is the source of events **T** in the stream, and a **Subscriber** is the consumer for those events.
-A **Subscriber** subscribes to a **Publisher** by invoking a "factory method" :
+A **Subscriber** subscribes to a **Publisher** by invoking a "factory method" in the Publisher that will push
+the stream items **<T>** starting a new **Subscription**:
 ```
 public interface Publisher<T> {
     public void subscribe(Subscriber<? super T> s);
 }
 ```
-in the Publisher that will push the stream items **<T>** starting a new **Subscription**.  
 
 When the Subscriber is ready to start handling events, it signals this via a **request** to that **Subscription** 
 ```
@@ -49,11 +49,12 @@ public interface Subscriber<T> {
 
 ## Flowable, Observable
 RxJava provides more types of publishers: 
-   - **Flowable** publisher that emits 0..N elements, and then completes successfully or with an error
+   - **Flowable** Publisher that emits 0..N elements, and then completes successfully or with an error
    - **Observable** like Flowables but without a backpressure strategy
-   - **Single** a specialized publisher that completes with a value successfully either an error.(doesn't have onComplete callback, instead onSuccess(val))
-   - **Maybe** a specialized publisher that can complete with / without a value or complete with an error.
-   - **Completable** a specialized publisher that just signals if it completed successfully or with an error.
+   
+   - **Single** a specialized emitter that completes with a value successfully either an error.(doesn't have onComplete callback, instead onSuccess(val))
+   - **Maybe** a specialized emitter that can complete with / without a value or complete with an error.
+   - **Completable** a specialized emitter that just signals if it completed successfully or with an error.
 
 Code is available at [Part01CreateFlowable.java](https://github.com/balamaci/rxjava-playground/blob/master/src/test/java/com/balamaci/rx/Part01CreateFlowable.java)
 
@@ -88,7 +89,7 @@ Using **Flowable.create** to handle the actual emissions of events with the even
 When subscribing to the Flowable with flowable.subscribe(...) the lambda code inside create() gets executed.
 Flowable.subscribe(...) can take 3 handlers for each type of event - onNext, onError and onCompleted.
 
-When using Observable.create you need to be aware of [BackPressure]() and that Observables created with 'create' are not BackPressure aware
+When using Observable.create you need to be aware of [backpressure](#backpressure) and that Observables created with 'create' are not BackPressure aware
 
 ``` 
 Observable<Integer> observable = Observable.create(subscriber -> {
@@ -143,7 +144,7 @@ Flowable<String> stream = Flowable.defer(() -> Flowable.just(blockingOperation()
 stream.subscribe(val -> log.info("Val " + val)); //only now the code inside defer() is executed
 ```
 
-### Multiple subscriptions to the same Observable 
+### Multiple subscriptions to the same Flowable 
 When subscribing to an Observable/Flowable, the create() method gets executed for each subscription this means that the events 
 inside create are re-emitted to each subscriber. 
 
@@ -190,7 +191,7 @@ will output
 ```
 
 ### Checking if there are any active subscribers 
-Inside the create() method, we can check is there are still active subscribers to our Observable.
+Inside the create() method, we can check is there are still active subscribers to our Flowable/Observable.
 It's a way to prevent to do extra work(like for ex. querying a datasource for entries) if no one is listening
 In the following example we'd expect to have an infinite stream, but because we stop if there are no active subscribers, we stop producing events.
 The **take()** operator unsubscribes from the Observable after it's received the specified amount of events.
@@ -721,9 +722,10 @@ Timeout operator raises exception when there are no events incoming before it's 
 **retry()** - resubscribes in case of exception to the Observable
 
 ```
-Observable<String> colors = Observable.just("red", "blue", "green", "yellow")
-       .concatMap(color -> delayedByLengthEmitter(TimeUnit.SECONDS, color) //we're delaying by string length secs
-                             .timeout(6, TimeUnit.SECONDS) //if there are no events flowing in the timeframe 
+Flowable<String> colors = Flowable.just("red", "blue", "green", "yellow")
+       .concatMap(color -> delayedByLengthEmitter(TimeUnit.SECONDS, color) 
+                             //if there are no events flowing in the timeframe   
+                             .timeout(6, TimeUnit.SECONDS)  
                              .retry(2)
                              .onErrorResumeNext(Observable.just("blank"))
        );
@@ -845,7 +847,189 @@ remoteOperation.repeatWhen(completed -> completed
    
 ## Backpressure
 
-Backpressure is related to preventing overloading the subscriber with too many events.
-It can be the case of a slow consumer that cannot keep up with the producer.
+It can be the case of a slow consumer that cannot keep up with the producer that is producing too many events
+that the subscriber cannot process. 
 
-   
+Backpressure relates to a feedback mechanism through which the subscriber can signal to the producer how much data 
+it can consume.
+
+The [reactive-streams](https://github.com/reactive-streams/reactive-streams-jvm) section above we saw that besides the onNext, onError and onComplete handlers, the Subscriber
+has an **onSubscribe(Subscription)**
+
+```
+public interface Subscriber<T> {
+    //signals to the Publisher to start sending events
+    public void onSubscribe(Subscription s);     
+    
+    public void onNext(T t);
+    public void onError(Throwable t);
+    public void onComplete();
+}
+```
+
+Subscription through which it can signal upstream it's ready to receive a number of items and after it
+processes the items request another batch.
+
+```
+public interface Subscription {
+    public void request(long n); //request n items
+    public void cancel();
+}
+```
+So in theory the Subscriber can prevent being overloaded by requesting an initial number of items. The Publisher would
+send those items downstream and not produce any more, until the Subscriber would request more. We say in theory because
+until now we did not see a custom **onSubscribe** request being implemented. This is because if not specified explicitly,
+there is a default implementation which requests of Long.MAX_VALUE which basically means "send all you have".
+
+Neither did we see the code in the producer that takes consideration of the number of items requested by the subscriber. 
+```
+Flux.create(subscriber -> {
+      log.info("Started emitting");
+
+      for(int i=0; i < 300; i++) {
+           if(subscriber.isCanceled()) {
+              return;
+           }
+           log.info("Emitting {}", i);
+           subscriber.next(i);
+      }
+
+      subscriber.complete();
+}
+```
+Looks like it's not possible to slow down production based on request(as there is no reference to the requested items),
+we can at most stop production if the subscriber canceled subscription. 
+
+This can be done if we extend Flowable so we can pass our custom Subscription type to the downstream subscriber:
+```
+private class CustomRangeFlowable extends Flowable<Integer> {
+
+        private int startFrom;
+        private int count;
+
+        CustomRangeFlowable(int startFrom, int count) {
+            this.startFrom = startFrom;
+            this.count = count;
+        }
+
+        @Override
+        public void subscribeActual(Subscriber<? super Integer> subscriber) {
+            subscriber.onSubscribe(new CustomRangeSubscription(startFrom, count, subscriber));
+        }
+
+        class CustomRangeSubscription implements Subscription {
+
+            volatile boolean cancelled;
+            boolean completed = false;
+            
+            private int count;
+            private int currentCount;
+            private int startFrom;
+
+            private Subscriber<? super Integer> actualSubscriber;
+
+            CustomRangeSubscription(int startFrom, int count, Subscriber<? super Integer> actualSubscriber) {
+                this.count = count;
+                this.startFrom = startFrom;
+                this.actualSubscriber = actualSubscriber;
+            }
+
+            @Override
+            public void request(long items) {
+                log.info("Downstream requests {} items", items);
+                for(int i=0; i < items; i++) {
+                    if(cancelled || completed) {
+                        return;
+                    }
+
+                    if(currentCount == count) {
+                        completed = true;
+                        if(cancelled) {
+                            return;
+                        }
+
+                        actualSubscriber.onComplete();
+                        return;
+                    }
+
+                    int emitVal = startFrom + currentCount;
+                    currentCount++;
+                    actualSubscriber.onNext(emitVal);
+                }
+            }
+
+            @Override
+            public void cancel() {
+                cancelled = true;
+            }
+        }
+    }
+```   
+now lets see how we can custom control how many items we request from upstream, to simulate an initial big request, 
+and then a request for another batch of items as soon as the subscriber finishes and is ready for another batch.
+Remember that **.subscribe(onNext(), onError, onComplete)** uses a default **onSubscribe**
+```
+(subscription) -> subscription.request(Long.MAX_VALUE);
+```
+  
+```
+Flowable<Integer> flux = new CustomRangeFlowable(5, 10);
+
+flux.subscribe(new Subscriber<Integer>() {
+
+       private Subscription subscription;
+       private int backlogItems;
+
+       private final int BATCH = 2;
+       private final int INITIAL_REQ = 5;
+
+       @Override
+       public void onSubscribe(Subscription subscription) {
+                this.subscription = subscription;
+                backlogItems = INITIAL_REQ;
+
+                log.info("Initial request {}", backlogItems);
+                subscription.request(backlogItems);
+            }
+
+            @Override
+            public void onNext(Integer val) {
+                log.info("Subscriber received {}", val);
+                backlogItems --;
+
+                if(backlogItems == 0) {
+                    backlogItems = BATCH;
+                    subscription.request(BATCH);
+                }
+            }
+
+            @Override
+            public void onError(Throwable throwable) {
+                log.info("Subscriber encountered error");
+            }
+
+            @Override
+            public void onComplete() {
+                log.info("Subscriber completed");
+            }
+        });
+=====================
+Initial request 5
+Downstream requests 5 items
+Subscriber received 5
+Subscriber received 6
+Subscriber received 7
+Subscriber received 8
+Subscriber received 9
+Downstream requests 2 items
+Subscriber received 10
+Subscriber received 11
+Downstream requests 2 items
+Subscriber received 12
+Subscriber received 13
+Downstream requests 2 items
+Subscriber received 14
+Subscriber completed        
+```  
+  
+  

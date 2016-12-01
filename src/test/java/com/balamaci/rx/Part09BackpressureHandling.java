@@ -8,6 +8,8 @@ import io.reactivex.Observable;
 import io.reactivex.schedulers.Schedulers;
 import io.reactivex.subjects.PublishSubject;
 import org.junit.Test;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -28,6 +30,52 @@ import java.util.concurrent.TimeUnit;
  * @author sbalamaci
  */
 public class Part09BackpressureHandling implements BaseTestObservables {
+
+    @Test
+    public void customBackpressureAwareFlux() {
+        Flowable<Integer> flux = new CustomRangeFlowable(5, 10);
+
+        flux.subscribe(new Subscriber<Integer>() {
+
+            private Subscription subscription;
+            private int backlogItems;
+
+            private final int BATCH = 2;
+            private final int INITIAL_REQ = 5;
+
+            @Override
+            public void onSubscribe(Subscription subscription) {
+                this.subscription = subscription;
+                backlogItems = INITIAL_REQ;
+
+                log.info("Initial request {}", backlogItems);
+                subscription.request(backlogItems);
+            }
+
+            @Override
+            public void onNext(Integer val) {
+                log.info("Subscriber received {}", val);
+                backlogItems--;
+
+                if (backlogItems == 0) {
+                    backlogItems = BATCH;
+                    subscription.request(BATCH);
+                }
+            }
+
+            @Override
+            public void onError(Throwable throwable) {
+                log.info("Subscriber encountered error");
+            }
+
+            @Override
+            public void onComplete() {
+                log.info("Subscriber completed");
+            }
+        });
+    }
+
+
 
     /**
      * We specify a buffering strategy, however since the buffer is not very large, we
@@ -168,6 +216,67 @@ public class Part09BackpressureHandling implements BaseTestObservables {
         flowable.subscribe(logNextAndSlowByMillis(50), logError(latch), logComplete(latch));
     }
 
+    private class CustomRangeFlowable extends Flowable<Integer> {
+
+        private int startFrom;
+        private int count;
+
+        CustomRangeFlowable(int startFrom, int count) {
+            this.startFrom = startFrom;
+            this.count = count;
+        }
+
+        @Override
+        public void subscribeActual(Subscriber<? super Integer> subscriber) {
+            subscriber.onSubscribe(new CustomRangeSubscription(startFrom, count, subscriber));
+        }
+
+        class CustomRangeSubscription implements Subscription {
+
+            volatile boolean cancelled;
+            boolean completed = false;
+            private int count;
+            private int currentCount;
+            private int startFrom;
+
+            private Subscriber<? super Integer> actualSubscriber;
+
+            CustomRangeSubscription(int startFrom, int count, Subscriber<? super Integer> actualSubscriber) {
+                this.count = count;
+                this.startFrom = startFrom;
+                this.actualSubscriber = actualSubscriber;
+            }
+
+            @Override
+            public void request(long items) {
+                log.info("Downstream requests {} items", items);
+                for(int i=0; i < items; i++) {
+                    if(cancelled || completed) {
+                        return;
+                    }
+
+                    if(currentCount == count) {
+                        completed = true;
+                        if(cancelled) {
+                            return;
+                        }
+
+                        actualSubscriber.onComplete();
+                        return;
+                    }
+
+                    int emitVal = startFrom + currentCount;
+                    currentCount++;
+                    actualSubscriber.onNext(emitVal);
+                }
+            }
+
+            @Override
+            public void cancel() {
+                cancelled = true;
+            }
+        }
+    }
 
 
 }
