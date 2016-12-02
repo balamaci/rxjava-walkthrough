@@ -883,7 +883,7 @@ there is a default implementation which requests of Long.MAX_VALUE which basical
 
 Neither did we see the code in the producer that takes consideration of the number of items requested by the subscriber. 
 ```
-Flux.create(subscriber -> {
+Flowable.create(subscriber -> {
       log.info("Started emitting");
 
       for(int i=0; i < 300; i++) {
@@ -895,7 +895,7 @@ Flux.create(subscriber -> {
       }
 
       subscriber.complete();
-}
+}, BackpressureStrategy.BUFFER); //BackpressureStrategy will be explained further bellow
 ```
 Looks like it's not possible to slow down production based on request(as there is no reference to the requested items),
 we can at most stop production if the subscriber canceled subscription. 
@@ -965,12 +965,8 @@ private class CustomRangeFlowable extends Flowable<Integer> {
         }
     }
 ```   
-now lets see how we can custom control how many items we request from upstream, to simulate an initial big request, 
-and then a request for another batch of items as soon as the subscriber finishes and is ready for another batch.
-Remember that **.subscribe(onNext(), onError, onComplete)** uses a default **onSubscribe**
-```
-(subscription) -> subscription.request(Long.MAX_VALUE);
-```
+Now lets see how we can custom control how many items we request from upstream, to simulate an initial big request, 
+and then a request for other smaller batches of items as soon as the subscriber finishes and is ready for another batch.
   
 ```
 Flowable<Integer> flux = new CustomRangeFlowable(5, 10);
@@ -1032,4 +1028,8 @@ Subscriber received 14
 Subscriber completed        
 ```  
   
+Remember that **.subscribe(onNext(), onError, onComplete)** uses a default **onSubscribe**
+```
+(subscription) -> subscription.request(Long.MAX_VALUE);
+```
   

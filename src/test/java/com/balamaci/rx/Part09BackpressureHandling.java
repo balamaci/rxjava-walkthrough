@@ -83,8 +83,8 @@ public class Part09BackpressureHandling implements BaseTestObservables {
      */
     @Test
     public void bufferingThenDroppingEvents() {
-        Flowable<Integer> flowable = observableWithoutBackpressureSupport()
-                .toFlowable(BackpressureStrategy.BUFFER)
+        Flowable<Integer> flowable = observableWithoutBackpressureSupport(200)
+                .toFlowable(BackpressureStrategy.ERROR)
                 .onBackpressureBuffer(30)
                 .onBackpressureDrop(val -> log.info("Dropped {}", val));
 
@@ -101,7 +101,7 @@ public class Part09BackpressureHandling implements BaseTestObservables {
      */
     @Test
     public void throwingBackpressureNotSupportedSlowOperator() {
-        Observable<Integer> observable = observableWithoutBackpressureSupport();
+        Observable<Integer> observable = observableWithoutBackpressureSupport(200);
 
         Flowable<String> flowable = observable
                 .observeOn(Schedulers.io())
@@ -114,7 +114,7 @@ public class Part09BackpressureHandling implements BaseTestObservables {
                     return "*" + val + "*";
                 });
 
-        subscribeWithSlowSubscriberAndWait(flowable);
+        subscribeWithLogWaiting(flowable);
     }
 
     /**
@@ -149,7 +149,7 @@ public class Part09BackpressureHandling implements BaseTestObservables {
      */
     @Test
     public void zipOperatorHasALimit() {
-        Observable<Integer> fast = observableWithoutBackpressureSupport();
+        Observable<Integer> fast = observableWithoutBackpressureSupport(200);
         Flowable<Long> slowStream = Flowable.interval(100, TimeUnit.MILLISECONDS);
 
         Observable<String> observable = Observable.zip(fast, slowStream.toObservable(),
@@ -173,7 +173,7 @@ public class Part09BackpressureHandling implements BaseTestObservables {
 
     @Test
     public void dropOverflowingEvents() {
-        Observable<Integer> observable = observableWithoutBackpressureSupport();
+        Observable<Integer> observable = observableWithoutBackpressureSupport(200);
 
         Flowable<Integer> flowable = observable
                 .toFlowable(BackpressureStrategy.DROP)
@@ -182,13 +182,12 @@ public class Part09BackpressureHandling implements BaseTestObservables {
     }
 
 
-    private Observable<Integer> observableWithoutBackpressureSupport() {
+    private Observable<Integer> observableWithoutBackpressureSupport(int items) {
         return Observable.create(subscriber -> {
             log.info("Started emitting");
 
-            for (int i = 0; i < 200; i++) {
+            for (int i = 0; i < items; i++) {
                 log.info("Emitting {}", i);
-                Helpers.sleepMillis(20);
                 subscriber.onNext(i);
             }
 
