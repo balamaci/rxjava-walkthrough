@@ -969,9 +969,9 @@ Now lets see how we can custom control how many items we request from upstream, 
 and then a request for other smaller batches of items as soon as the subscriber finishes and is ready for another batch.
   
 ```
-Flowable<Integer> flux = new CustomRangeFlowable(5, 10);
+Flowable<Integer> flowable = new CustomRangeFlowable(5, 10);
 
-flux.subscribe(new Subscriber<Integer>() {
+flowable.subscribe(new Subscriber<Integer>() {
 
        private Subscription subscription;
        private int backlogItems;
@@ -1027,9 +1027,81 @@ Downstream requests 2 items
 Subscriber received 14
 Subscriber completed        
 ```  
+
+Returning to the _Flowable.create()_ example since it's not taking any account of the requested 
+items by the subscriber, does it mean it might overwhelm a slow Subscriber? 
+```
+private Flowable<Integer> createFlowable(int items,
+                     BackpressureStrategy backpressureStrategy) {
+
+return Flowable.create(subscriber -> {
+        log.info("Started emitting");
+
+        for (int i = 0; i < items; i++) {
+            if(subscriber.isCancelled()) {
+                 return;
+            }
+                
+            log.info("Emitting {}", i);
+            subscriber.onNext(i);
+        }
+
+        subscriber.onComplete();
+}, backpressureStrategy); //can be BackpressureStrategy.DROP, BUFFER, LATEST,..
+```
+This is where the 2nd parameter _BackpressureStrategy_ comes in that allows you to specify what to do 
+in the case.
+ 
+   - BackpressureStrategy.BUFFER buffer in memory the events that overflow. Of course is we don't drop over some threshold, it might lead to OufOfMemory. 
+   - BackpressureStrategy.DROP just drop the overflowing events
+   - BackpressureStrategy.LATEST drop queued older events and keep more recent
+   - BackpressureStrategy.ERROR we get an error in the subscriber immediately  
+   - BackpressureStrategy.MISSING 
+
   
-Remember that **.subscribe(onNext(), onError, onComplete)** uses a default **onSubscribe**
+Still what does it mean to 'overwhelm' the subscriber? 
+It means to emit more items than requested downstream.
+But we said that by default the subscriber requests Long.MAX_VALUE since the code 
+**flowable.subscribe(onNext(), onError, onComplete)** uses a default **onSubscribe**:
 ```
 (subscription) -> subscription.request(Long.MAX_VALUE);
 ```
+
+so unless we override it like in our custom Subscriber above, it means it would never overflow. But between the Publisher and the Subscriber you'd have a series of operators. 
+When we subscribe, a Subscriber travels up through all operators to the original Publisher and some operators override 
+the requested items upstream. One such operator is **observeOn**() which makes it's own request to the upstream Publisher(256 by default),
+but can take a parameter to specify the request size.
+
+```
+Flowable<Integer> flowable = createFlowable(5, BackpressureStrategy.DROP)
+                .observeOn(Schedulers.io(), false, 3);
+flowable.subscribe((val) -> {
+                               log.info("Subscriber received: {}", val);
+                               Helpers.sleepMillis(millis);
+                           }, logError(), logComplete());
+======
+[main] - Started emitting
+[main] - Emitting 0
+[main] - Emitting 1
+[main] - Emitting 2
+[main] - Emitting 3
+[main] - Emitting 4
+[RxCachedThreadScheduler-1] - Subscriber received: 0
+[RxCachedThreadScheduler-1] - Subscriber received: 1
+[RxCachedThreadScheduler-1] - Subscriber received: 2
+[RxCachedThreadScheduler-1] - Subscriber got Completed event  
+```
+This is expected, as the subscription travels upstream through the operators to the source Flowable, while initialy
+the Subscriber requesting Long.MAX_VALUE from the upstream operator **observeOn**, which in turn subscribes to the source and it requests just 3 items from the source instead.
+Since we used **BackpressureStrategy.DROP** all the items emitted outside the expected 3, get discarded and thus never reach our subscriber.
+
+
+Also you can transform an Observable to Flowable by specifying a BackpressureStrategy, otherwise Observables 
+just throw exception on overflowing(same as using BackpressureStrategy.ERROR in Flowable.create()).
+```
+Flowable flowable = observable.toFlowable(BackpressureStrategy.ERROR)
+```
+
+
+
   

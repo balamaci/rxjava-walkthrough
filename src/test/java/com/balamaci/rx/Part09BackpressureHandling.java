@@ -83,15 +83,14 @@ public class Part09BackpressureHandling implements BaseTestObservables {
      */
     @Test
     public void bufferingThenDroppingEvents() {
-        Flowable<Integer> flowable = observableWithoutBackpressureSupport(200)
-                .toFlowable(BackpressureStrategy.ERROR)
-                .onBackpressureBuffer(30)
+        Flowable<Integer> flowable = createFlowable(10, BackpressureStrategy.ERROR)
+                .onBackpressureBuffer(5)
                 .onBackpressureDrop(val -> log.info("Dropped {}", val));
 
         //we need to switch threads to not run the producer in the same thread as the subscriber(which waits some time
         // to simulate a slow subscriber)
         flowable = flowable
-                .observeOn(Schedulers.io());
+                .observeOn(Schedulers.io(), false, 3);
 
         subscribeWithSlowSubscriberAndWait(flowable);
     }
@@ -101,11 +100,9 @@ public class Part09BackpressureHandling implements BaseTestObservables {
      */
     @Test
     public void throwingBackpressureNotSupportedSlowOperator() {
-        Observable<Integer> observable = observableWithoutBackpressureSupport(200);
 
-        Flowable<String> flowable = observable
+        Flowable<String> flowable = createFlowable(200, BackpressureStrategy.MISSING)
                 .observeOn(Schedulers.io())
-                .toFlowable(BackpressureStrategy.BUFFER)
                 .onBackpressureBuffer(30, () -> log.info("***************Overflowing"),
                         BackpressureOverflowStrategy.DROP_OLDEST)
                 .onBackpressureDrop(val -> log.info("Dropped {}", val))
@@ -149,10 +146,10 @@ public class Part09BackpressureHandling implements BaseTestObservables {
      */
     @Test
     public void zipOperatorHasALimit() {
-        Observable<Integer> fast = observableWithoutBackpressureSupport(200);
+        Flowable<Integer> fast = createFlowable(200, BackpressureStrategy.MISSING);
         Flowable<Long> slowStream = Flowable.interval(100, TimeUnit.MILLISECONDS);
 
-        Observable<String> observable = Observable.zip(fast, slowStream.toObservable(),
+        Flowable<String> observable = Flowable.zip(fast, slowStream,
                 (val1, val2) -> val1 + " " + val2);
 
         subscribeWithSlowSubscriberAndWait(observable);
@@ -173,26 +170,29 @@ public class Part09BackpressureHandling implements BaseTestObservables {
 
     @Test
     public void dropOverflowingEvents() {
-        Observable<Integer> observable = observableWithoutBackpressureSupport(200);
+        Flowable<Integer> flowable = createFlowable(5, BackpressureStrategy.DROP)
+                .observeOn(Schedulers.io(), false, 3);
 
-        Flowable<Integer> flowable = observable
-                .toFlowable(BackpressureStrategy.DROP)
-                .observeOn(Schedulers.io());
         subscribeWithSlowSubscriberAndWait(flowable);
     }
 
 
-    private Observable<Integer> observableWithoutBackpressureSupport(int items) {
-        return Observable.create(subscriber -> {
+    private Flowable<Integer> createFlowable(int items,
+                                    BackpressureStrategy backpressureStrategy) {
+        return Flowable.<Integer>create(subscriber -> {
             log.info("Started emitting");
 
             for (int i = 0; i < items; i++) {
+                if(subscriber.isCancelled()) {
+                    return;
+                }
+
                 log.info("Emitting {}", i);
                 subscriber.onNext(i);
             }
 
             subscriber.onComplete();
-        });
+        }, backpressureStrategy);
     }
 
 
