@@ -1095,6 +1095,9 @@ This is expected, as the subscription travels upstream through the operators to 
 the Subscriber requesting Long.MAX_VALUE from the upstream operator **observeOn**, which in turn subscribes to the source and it requests just 3 items from the source instead.
 Since we used **BackpressureStrategy.DROP** all the items emitted outside the expected 3, get discarded and thus never reach our subscriber.
 
+You may wonder what would have happened if we didn't use **observeOn**. We had to use it if we wanted to be able
+to produce faster than the subscriber, it wasn't just to show a limited request operator, because we'd need a 
+separate thread 
 
 Also you can transform an Observable to Flowable by specifying a BackpressureStrategy, otherwise Observables 
 just throw exception on overflowing(same as using BackpressureStrategy.ERROR in Flowable.create()).
@@ -1102,6 +1105,9 @@ just throw exception on overflowing(same as using BackpressureStrategy.ERROR in 
 Flowable flowable = observable.toFlowable(BackpressureStrategy.ERROR)
 ```
 
+There are also specialized operators to handle backpressure:
+```
 
+```
 
   
