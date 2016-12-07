@@ -77,14 +77,30 @@ public class Part09BackpressureHandling implements BaseTestObservables {
     }
 
     /**
-     * We use BackpressureStrategy.DROP in create() to handle events
+     * We use BackpressureStrategy.DROP in create() to handle events that are emitted outside
+     * the request amount from the downstream subscriber.
      *
      * We see that events that reach the subscriber are those only 3 requested by the
-     * observeOn operator, the events produced outside of the requested amount are discarded
+     * observeOn operator, the events produced outside of the requested amount
+     * are discarded (BackpressureStrategy.DROP).
+     *
+     * observeOn has a default request size from upstream of 128(system parameter {@code rx2.buffer-size})
+     *
      */
     @Test
-    public void dropOverflowingEvents() {
-        Flowable<Integer> flowable = createFlowable(5, BackpressureStrategy.DROP)
+    public void createFlowableWithBackpressureStrategy() {
+        BackpressureStrategy backpressureStrategy =
+                BackpressureStrategy.DROP
+//                BackpressureStrategy.BUFFER
+//              BackpressureStrategy.LATEST
+//              BackpressureStrategy.ERROR
+                ;
+
+        Flowable<Integer> flowable = createFlowable(5, backpressureStrategy);
+
+        //we need to switch threads to not run the producer in the same thread as the subscriber(which waits some time
+        // to simulate a slow subscriber)
+        flowable = flowable
                 .observeOn(Schedulers.io(), false, 3);
 
         subscribeWithSlowSubscriberAndWait(flowable);
@@ -100,6 +116,10 @@ public class Part09BackpressureHandling implements BaseTestObservables {
      *
      * We specify a buffering strategy in the example, however since the buffer is not very large,
      * we still get an exception after the 8th value - 3(requested) + 5(buffer)
+     *
+     * We create the Flowable with BackpressureStrategy.MISSING saying we don't care about backpressure
+     * but let one of the onBackpressureXXX operators handle it.
+     *
      */
     @Test
     public void bufferingBackpressureOperator() {
@@ -120,7 +140,7 @@ public class Part09BackpressureHandling implements BaseTestObservables {
      */
     @Test
     public void bufferingThenDroppingEvents() {
-        Flowable<Integer> flowable = createFlowable(10, BackpressureStrategy.ERROR)
+        Flowable<Integer> flowable = createFlowable(10, BackpressureStrategy.MISSING)
                 .onBackpressureBuffer(5, () -> log.info("Buffer has overflown"),
                         BackpressureOverflowStrategy.DROP_OLDEST);
 
@@ -178,6 +198,20 @@ public class Part09BackpressureHandling implements BaseTestObservables {
     }
 
     /**
+     *
+     */
+    @Test
+    public void cascadingOnBackpressureXXXOperators() {
+        Flowable<Integer> flowable = createFlowable(10, BackpressureStrategy.MISSING)
+                .onBackpressureBuffer(5)
+                .onBackpressureDrop((val) -> log.info("Dropping {}", val))
+                .observeOn(Schedulers.io(), false, 3);
+
+        subscribeWithSlowSubscriberAndWait(flowable);
+    }
+
+
+    /**
      * Zipping a slow stream with a faster one also can cause a backpressure problem
      */
     @Test
@@ -193,10 +227,10 @@ public class Part09BackpressureHandling implements BaseTestObservables {
 
     @Test
     public void backpressureAwareObservable() {
-        Flowable<Integer> flowable = Flowable.range(0, 200);
+        Flowable<Integer> flowable = Flowable.range(0, 10);
 
         flowable = flowable
-                .observeOn(Schedulers.io());
+                .observeOn(Schedulers.io(), false, 3);
 
         subscribeWithSlowSubscriberAndWait(flowable);
     }

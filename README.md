@@ -851,7 +851,7 @@ It can be the case of a slow consumer that cannot keep up with the producer that
 that the subscriber cannot process. 
 
 Backpressure relates to a feedback mechanism through which the subscriber can signal to the producer how much data 
-it can consume.
+it can consume and so to produce only that amount.
 
 The [reactive-streams](https://github.com/reactive-streams/reactive-streams-jvm) section above we saw that besides the onNext, onError and onComplete handlers, the Subscriber
 has an **onSubscribe(Subscription)**
@@ -1056,7 +1056,8 @@ in the case.
    - BackpressureStrategy.DROP just drop the overflowing events
    - BackpressureStrategy.LATEST drop queued older events and keep more recent
    - BackpressureStrategy.ERROR we get an error in the subscriber immediately  
-   - BackpressureStrategy.MISSING 
+   - BackpressureStrategy.MISSING means we don't care about backpressure(we let one of the downstream operators
+   onBackpressureXXX handle it -explained further down-)
 
   
 Still what does it mean to 'overwhelm' the subscriber? 
