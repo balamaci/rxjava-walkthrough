@@ -91,7 +91,7 @@ public class Part09BackpressureHandling implements BaseTestObservables {
     public void createFlowableWithBackpressureStrategy() {
         BackpressureStrategy backpressureStrategy =
                 BackpressureStrategy.DROP
-//                BackpressureStrategy.BUFFER
+//              BackpressureStrategy.BUFFER
 //              BackpressureStrategy.LATEST
 //              BackpressureStrategy.ERROR
                 ;
@@ -113,8 +113,10 @@ public class Part09BackpressureHandling implements BaseTestObservables {
      * - onBackpressureBuffer
      * - onBackpressureDrop
      * - onBackpressureLatest
+     * These operators request from upstream the Long.MAX_VALUE(unbounded amount) and then they buffer(onBackpressureBuffer)
+     * the events for downstream and send the events as requested.
      *
-     * We specify a buffering strategy in the example, however since the buffer is not very large,
+     * In the example we specify a buffering strategy in the example, however since the buffer is not very large,
      * we still get an exception after the 8th value - 3(requested) + 5(buffer)
      *
      * We create the Flowable with BackpressureStrategy.MISSING saying we don't care about backpressure
@@ -126,8 +128,6 @@ public class Part09BackpressureHandling implements BaseTestObservables {
         Flowable<Integer> flowable = createFlowable(10, BackpressureStrategy.MISSING)
                 .onBackpressureBuffer(5, () -> log.info("Buffer has overflown"));
 
-        //we need to switch threads to not run the producer in the same thread as the subscriber(which waits some time
-        // to simulate a slow subscriber)
         flowable = flowable
                 .observeOn(Schedulers.io(), false, 3);
 
@@ -155,7 +155,7 @@ public class Part09BackpressureHandling implements BaseTestObservables {
 
     /**
      * Not only a slow subscriber triggers backpressure, but also a slow operator
-     * that would slow down the handling of events and new request calls for new items
+     * that slows down the handling of events and new request calls for new items
      */
     @Test
     public void throwingBackpressureNotSupportedSlowOperator() {
@@ -171,7 +171,7 @@ public class Part09BackpressureHandling implements BaseTestObservables {
     }
 
     /**
-     * Backpressure through operators can be added used whenever necessary and it's not limited to
+     * Backpressure operators can be added whenever necessary and it's not limited to
      * cold publishers and we can use them on hot publishers also
      */
     @Test
@@ -198,7 +198,19 @@ public class Part09BackpressureHandling implements BaseTestObservables {
     }
 
     /**
+     * Chaining together multiple onBackpressureXXX operators doesn't actually make sense
+     * Using
+     *                 .onBackpressureBuffer(5)
+     *                 .onBackpressureDrop((val) -> log.info("Dropping {}", val))
+     * is not behaving as maybe expected - buffer 5 values, and then dropping overflowing events-.
      *
+     * Because onBackpressureDrop subscribes to the previous onBackpressureBuffer operator
+     * signaling its requesting Long.MAX_VALUE(unbounded amount) from it, the onBackpressureBuffer will never feel
+     * its subscriber is overwhelmed and never "trigger" meaning that the last onBackpressureXXX operator overrides
+     * the previous one.
+     *
+     * Of course for implementing an event dropping strategy after a full buffer, there is the special overrided
+     * version of onBackpressureBuffer that takes a BackpressureOverflowStrategy.
      */
     @Test
     public void cascadingOnBackpressureXXXOperators() {

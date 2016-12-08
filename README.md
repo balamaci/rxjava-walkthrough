@@ -599,7 +599,7 @@ returns:
 23:30:17 [main] INFO - Subscriber received: blue*XXX
 23:30:17 [main] ERROR - Subscriber received error 'Encountered red'
 ```
-After the map() operator encounters an error it unsubscribes(cancels the subscription) from the stream 
+After the map() operator encounters an error it unsubscribes(cancels the subscription) from upstream 
 - therefore 'yellow' is not even emitted-. The error travels downstream and triggers the error handler in the subscriber.
 
 
@@ -649,7 +649,7 @@ private Observable<String> simulateRemoteOperation(String color) {
 
 
 ```
-Observable<String> colors = Observable.just("green", "blue", "red", "white", "blue")
+Flowable<String> colors = Flowable.just("green", "blue", "red", "white", "blue")
                 .flatMap(color -> simulateRemoteOperation(color))
                 .onErrorReturn(throwable -> "-blank-");
                 
@@ -670,7 +670,7 @@ stream and the remaining colors are not longer emitted
 
 
 ```
-Observable<String> colors = Observable.just("green", "blue", "red", "white", "blue")
+Flowable<String> colors = Flowable.just("green", "blue", "red", "white", "blue")
                 .flatMap(color -> simulateRemoteOperation(color)
                                     .onErrorReturn(throwable -> "-blank-")
                 );
@@ -1054,14 +1054,14 @@ in the case.
  
    - BackpressureStrategy.BUFFER buffer in memory the events that overflow. Of course is we don't drop over some threshold, it might lead to OufOfMemory. 
    - BackpressureStrategy.DROP just drop the overflowing events
-   - BackpressureStrategy.LATEST drop queued older events and keep more recent
+   - BackpressureStrategy.LATEST keep only recent event and discards previous unconsumed events.
    - BackpressureStrategy.ERROR we get an error in the subscriber immediately  
    - BackpressureStrategy.MISSING means we don't care about backpressure(we let one of the downstream operators
    onBackpressureXXX handle it -explained further down-)
 
   
 Still what does it mean to 'overwhelm' the subscriber? 
-It means to emit more items than requested downstream.
+It means to emit more items than requested by downstream subscriber.
 But we said that by default the subscriber requests Long.MAX_VALUE since the code 
 **flowable.subscribe(onNext(), onError, onComplete)** uses a default **onSubscribe**:
 ```
@@ -1092,23 +1092,123 @@ flowable.subscribe((val) -> {
 [RxCachedThreadScheduler-1] - Subscriber received: 2
 [RxCachedThreadScheduler-1] - Subscriber got Completed event  
 ```
-This is expected, as the subscription travels upstream through the operators to the source Flowable, while initialy
+This is expected, as the subscription travels upstream through the operators to the source Flowable, while initially
 the Subscriber requesting Long.MAX_VALUE from the upstream operator **observeOn**, which in turn subscribes to the source and it requests just 3 items from the source instead.
 Since we used **BackpressureStrategy.DROP** all the items emitted outside the expected 3, get discarded and thus never reach our subscriber.
 
 You may wonder what would have happened if we didn't use **observeOn**. We had to use it if we wanted to be able
-to produce faster than the subscriber, it wasn't just to show a limited request operator, because we'd need a 
-separate thread 
+to produce faster than the subscriber(it wasn't just to show a limited request operator), because we'd need a 
+separate thread to produce events faster than the subscriber processes them.   
 
 Also you can transform an Observable to Flowable by specifying a BackpressureStrategy, otherwise Observables 
-just throw exception on overflowing(same as using BackpressureStrategy.ERROR in Flowable.create()).
+just throw exception on overflowing(same as using BackpressureStrategy.DROP in Flowable.create()).
 ```
-Flowable flowable = observable.toFlowable(BackpressureStrategy.ERROR)
+Flowable flowable = observable.toFlowable(BackpressureStrategy.DROP)
+```
+so can a hot Publisher be converted to a Flowable:
+```
+PublishSubject<Integer> subject = PublishSubject.create();
+
+Flowable<Integer> flowable = subject
+                .toFlowable(BackpressureStrategy.DROP)
 ```
 
-There are also specialized operators to handle backpressure:
-```
+There are also specialized operators to handle backpressure the onBackpressureXXX operators: **onBackpressureBuffer**,
+**onBackpressureDrop**, **onBackpressureLatest**
+
+These operators request Long.MAX_VALUE(unbounded amount) from upstream and then take it upon themselves to manage the 
+requests from downstream. 
+In the case of _onBackpressureBuffer_ it adds in an internal queue and send downstream the events as requested,
+_onBackpressureDrop_ just discards events that are received from upstream more than requested from downstream, 
+_onBackpressureLatest_ also drops emitted events excluding the last emitted event(most recent).  
 
 ```
+Flowable<Integer> flowable = createFlowable(10, BackpressureStrategy.MISSING)
+                .onBackpressureBuffer(5, () -> log.info("Buffer has overflown"));
+
+flowable = flowable
+                .observeOn(Schedulers.io(), false, 3);
+subscribeWithSlowSubscriber(flowable);                
+
+=====                
+[main] - Started emitting
+[main] - Emitting 0
+[main] - Emitting 1
+[RxCachedThreadScheduler-1] - Subscriber received: 0
+[main] - Emitting 2
+[main] - Emitting 3
+[main] - Emitting 4
+[main] - Emitting 5
+[main] - Emitting 6
+[main] - Emitting 7
+[main] - Emitting 8
+[main] - Emitting 9
+[main] - Buffer has overflown
+[RxCachedThreadScheduler-1] ERROR - Subscriber received error 'Buffer is full'                
+```
+
+We create the Flowable with _BackpressureStrategy.MISSING_ saying we don't care about backpressure
+but let one of the onBackpressureXXX operators handle it.
+Notice however 
+
+
+
+Chaining together multiple onBackpressureXXX operators doesn't actually make sense
+Using something like
+```
+Flowable<Integer> flowable = createFlowable(10, BackpressureStrategy.MISSING)
+                 .onBackpressureBuffer(5)
+                 .onBackpressureDrop((val) -> log.info("Dropping {}", val))
+flowable = flowable
+                .observeOn(Schedulers.io(), false, 3);
+                 
+subscribeWithSlowSubscriber(flowable);
+```
+is not behaving as maybe you'd expected - buffer 5 values, and then dropping overflowing events-.
+Because _onBackpressureDrop_ subscribes to the previous _onBackpressureBuffer_ operator
+signaling it's requesting **Long.MAX_VALUE**(unbounded amount) from it. 
+Thus onBackpressureBuffer will never feel its subscriber is overwhelmed and never "trigger", meaning that the last 
+onBackpressureXXX operator overrides the previous one if they are chained.
+
+Of course for implementing an event dropping strategy after a full buffer, there is the special overrided
+version of onBackpressureBuffer that takes a **BackpressureOverflowStrategy**.
+```
+Flowable<Integer> flowable = createFlowable(10, BackpressureStrategy.MISSING)
+                .onBackpressureBuffer(5, () -> log.info("Buffer has overflown"),
+                                            BackpressureOverflowStrategy.DROP_OLDEST);
+
+flowable = flowable
+                .observeOn(Schedulers.io(), false, 3);
+
+subscribeWithSlowSubscriber(flowable);
+
+===============
+[main] - Started emitting
+[main] - Emitting 0
+[main] - Emitting 1
+[RxCachedThreadScheduler-1] - Subscriber received: 0
+[main] - Emitting 2
+[main] - Emitting 3
+[main] - Emitting 4
+[main] - Emitting 5
+[main] - Emitting 6
+[main] - Emitting 7
+[main] - Emitting 8
+[main] - Buffer has overflown
+[main] - Emitting 9
+[main] - Buffer has overflown
+[RxCachedThreadScheduler-1] - Subscriber received: 1
+[RxCachedThreadScheduler-1] - Subscriber received: 2
+[RxCachedThreadScheduler-1] - Subscriber received: 5
+[RxCachedThreadScheduler-1] - Subscriber received: 6
+[RxCachedThreadScheduler-1] - Subscriber received: 7
+[RxCachedThreadScheduler-1] - Subscriber received: 8
+[RxCachedThreadScheduler-1] - Subscriber received: 9
+[RxCachedThreadScheduler-1] - Subscriber got Completed event
+```
+
+
+onBackpressureXXX operators can be added whenever necessary and it's not limited to cold publishers and we can use them 
+on hot publishers also.
 
   
