@@ -247,9 +247,9 @@ will terminate before we see the text from the log.
 
 
 ### scan
-Takes an initial value and a function(accumulator, currentValue). It goes through the events 
-sequence and combines the current event value with the previous result(accumulator) emitting downstream the
-The initial value is used for the first event
+Takes an **initial value** and a **function(accumulator, currentValue)**. It goes through the events
+sequence and combines the current event value with the previous result(accumulator) emitting downstream the function's
+result for each event(the initial value is used for the first event)
 
 ```
 Flowable<Integer> numbers = 

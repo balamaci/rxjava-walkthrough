@@ -71,8 +71,7 @@ public class Part02SimpleOperators implements BaseTestObservables {
     /**
      * scan operator - takes an initial value and a function(accumulator, currentValue). It goes through the events
      * sequence and combines the current event value with the previous result(accumulator) emitting downstream the
-     * The initial value is used for the first event
-     *
+     * the function's result for each event(the initial value is used for the first event).
      */
     @Test
     public void scanOperator() {
