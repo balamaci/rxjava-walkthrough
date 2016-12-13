@@ -50,6 +50,18 @@ public interface BaseTestObservables {
         );
     }
 
+    default <T> void subscribeWithLogWaiting(Observable<T> observable) {
+        CountDownLatch latch = new CountDownLatch(1);
+
+        observable.subscribe(
+                logNext(),
+                logError(latch),
+                logComplete(latch)
+        );
+
+        Helpers.wait(latch);
+    }
+
     default <T> void subscribeWithLog(Single<T> single) {
         single.subscribe(
                 val -> log.info("Subscriber received: {}", val),
