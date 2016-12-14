@@ -50,7 +50,7 @@ public class Part04HotPublishers implements BaseTestObservables {
      * ReplaySubject keeps a buffer of events that it 'replays' to each new subscriber, first he receives a batch of missed
      * and only later events in real-time.
      *
-     * PublishSubject - doesn't keep a buffer but instead, meaning if another subscriber subscribes later
+     * PublishSubject - doesn't keep a buffer but instead, meaning if another subscriber subscribes later, it's going to loose events
      */
 
     private int counter = 0;
@@ -60,12 +60,12 @@ public class Part04HotPublishers implements BaseTestObservables {
         Subject<Integer> subject = ReplaySubject.createWithSize(50);
 
         Runnable action = () -> {
-            counter ++;
-
             if(counter == 10) {
                 subject.onComplete();
                 return;
             }
+
+            counter ++;
 
             log.info("Emitted {}", counter);
             subject.onNext(counter);
@@ -74,12 +74,12 @@ public class Part04HotPublishers implements BaseTestObservables {
         startPushingEventsToSubject(action);
 
         Helpers.sleepMillis(1000);
+        CountDownLatch latch = new CountDownLatch(2);
         log.info("Subscribing 1st");
-        subject.subscribe(val -> log.info("Subscriber1 received {}", val));
+        subject.subscribe(val -> log.info("Subscriber1 received {}", val), logError(), logComplete(latch));
 
         Helpers.sleepMillis(1000);
         log.info("Subscribing 2nd");
-        CountDownLatch latch = new CountDownLatch(1);
         subject.subscribe(val -> log.info("Subscriber2 received {}", val), logError(), logComplete(latch));
         Helpers.wait(latch);
     }
@@ -90,12 +90,12 @@ public class Part04HotPublishers implements BaseTestObservables {
         Subject<Integer> subject = PublishSubject.create();
 
         Runnable action = () -> {
-            counter ++;
-
             if(counter == 10) {
                 subject.onComplete();
                 return;
             }
+
+            counter ++;
 
             log.info("Emitted {}", counter);
             subject.onNext(counter);
@@ -104,14 +104,41 @@ public class Part04HotPublishers implements BaseTestObservables {
 
         Helpers.sleepMillis(1000);
         log.info("Subscribing 1st");
-        subject.subscribe(val -> log.info("Subscriber1 received {}", val));
+
+        CountDownLatch latch = new CountDownLatch(2);
+        subject
+                .subscribe(val -> log.info("Subscriber1 received {}", val), logError(), logComplete(latch));
 
         Helpers.sleepMillis(1000);
         log.info("Subscribing 2nd");
-        CountDownLatch latch = new CountDownLatch(1);
         subject.subscribe(val -> log.info("Subscriber2 received {}", val), logError(), logComplete(latch));
         Helpers.wait(latch);
     }
+
+
+    /**
+     * Because reactive stream specs mandates that events should be ordered(cannot emit downstream two events simultaneously)
+     * it means that it's illegal to call onNext,onComplete,onError from different threads.
+     *
+     * To make this easy there is the .toSerialized() operator that wraps the Subject inside a SerializedSubject
+     * which basically just calls the onNext,.. methods of the wrapped Subject inside a synchronized block.
+     */
+    @Test
+    public void callsToSubjectMethodsMustHappenOnSameThread() {
+        Subject<Integer> subject = PublishSubject.create();
+
+        CountDownLatch latch = new CountDownLatch(1);
+
+        Subject<Integer> serializedSubject = subject.toSerialized();
+        subject.subscribe(logNext(), logError(), logComplete(latch));
+
+        new Thread(() -> serializedSubject.onNext(1), "thread1").start();
+        new Thread(() -> serializedSubject.onNext(2), "thread2").start();
+        new Thread(() -> serializedSubject.onComplete(), "thread3").start();
+
+        Helpers.wait(latch);
+    }
+
 
     private void startPushingEventsToSubject(Runnable action) {
         ScheduledExecutorService scheduledExecutorService = Executors.newScheduledThreadPool(1);
