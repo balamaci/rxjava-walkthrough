@@ -11,6 +11,7 @@ also available for [reactor-core](https://github.com/balamaci/reactor-core-playg
    - [Schedulers](#schedulers)
    - [Error Handling](#error-handling)
    - [Backpressure](#backpressure)
+   - [Articles and books](#articles)
 
 ## Reactive Streams
 Reactive Streams is a programming concept for handling asynchronous 
@@ -48,7 +49,7 @@ public interface Subscriber<T> {
 ```
 
 ## Flowable, Observable
-RxJava provides more types of publishers: 
+RxJava provides more types of event publishers: 
    - **Flowable** Publisher that emits 0..N elements, and then completes successfully or with an error
    - **Observable** like Flowables but without a backpressure strategy
    
@@ -1211,4 +1212,6 @@ subscribeWithSlowSubscriber(flowable);
 onBackpressureXXX operators can be added whenever necessary and it's not limited to cold publishers and we can use them 
 on hot publishers also.
 
+## Articles and books further reading
+[Reactive Programming with RxJava](http://shop.oreilly.com/product/0636920042228.do)
   
