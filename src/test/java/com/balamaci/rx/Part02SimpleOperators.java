@@ -42,7 +42,7 @@ public class Part02SimpleOperators implements BaseTestObservables {
     @Test
     public void timerOperator() {
         log.info("Starting");
-        Flowable flowable = Flowable.timer(5, TimeUnit.SECONDS);
+        Flowable<Long> flowable = Flowable.timer(5, TimeUnit.SECONDS);
         subscribeWithLogWaiting(flowable);
     }
 
@@ -62,7 +62,7 @@ public class Part02SimpleOperators implements BaseTestObservables {
     @Test
     public void intervalOperator() {
         log.info("Starting");
-        Flowable flowable = Flowable.interval(1, TimeUnit.SECONDS)
+        Flowable<Long> flowable = Flowable.interval(1, TimeUnit.SECONDS)
                                     .take(5);
 
         subscribeWithLogWaiting(flowable);

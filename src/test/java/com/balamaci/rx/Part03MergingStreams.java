@@ -102,7 +102,7 @@ public class Part03MergingStreams implements BaseTestObservables {
 
     /**
      * combineLatest pairs events from multiple streams, but instead of waiting for an event
-     * from all other streams, it uses the last emitted event from that stream
+     * from other streams, it uses the last emitted event from that stream
      */
     @Test
     public void combineLatest() {
@@ -111,8 +111,8 @@ public class Part03MergingStreams implements BaseTestObservables {
         Flowable<String> colors = periodicEmitter("red", "green", "blue", 3, TimeUnit.SECONDS);
         Flowable<Long> numbers = Flowable.interval(1, TimeUnit.SECONDS)
                 .take(4);
-        Flowable observable = Flowable.combineLatest(colors, numbers, Pair::new);
+        Flowable combinedFlowables = Flowable.combineLatest(colors, numbers, Pair::new);
 
-        subscribeWithLogWaiting(observable);
+        subscribeWithLogWaiting(combinedFlowables);
     }
 }

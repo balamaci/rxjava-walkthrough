@@ -1,12 +1,13 @@
 package com.balamaci.rx;
 
 import com.balamaci.rx.util.Helpers;
-import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
+import io.reactivex.Observable;
 import io.reactivex.Single;
 import io.reactivex.schedulers.Schedulers;
 import org.junit.Test;
 
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -35,6 +36,32 @@ import java.util.concurrent.Executors;
  */
 public class Part07Schedulers implements BaseTestObservables {
 
+    @Test
+    public void subscribingThread() {
+        CountDownLatch latch = new CountDownLatch(1);
+
+        Observable<Integer> observable = Observable.<Integer>create(subscriber -> {
+            log.info("Someone subscribed");
+            new Thread(() -> {
+                log.info("Emitting..");
+                subscriber.onNext(1);
+                subscriber.onComplete();
+            }, "custom-thread").start();
+        })
+        .map(val -> {
+              log.info("Mapping..");
+              return val * 10;
+        });
+
+        observable.subscribe(logNext(), logError(), logComplete(latch));
+        Helpers.wait(latch);
+
+        log.info("Blocking Subscribe");
+//        observable.blockingSubscribe(logNext(), logError(), logComplete());
+        observable.observeOn(Schedulers.trampoline());
+        log.info("Got");
+    }
+
     /**
      * subscribeOn allows to specify which Scheduler invokes the code contained in the lambda code for Observable.create()
      */
@@ -42,7 +69,7 @@ public class Part07Schedulers implements BaseTestObservables {
     public void testSubscribeOn() {
         log.info("Starting");
 
-        Flowable<Integer> observable = Flowable.create(subscriber -> { //code that will execute inside the IO ThreadPool
+        Observable<Integer> observable = Observable.create(subscriber -> { //code that will execute inside the IO ThreadPool
             log.info("Starting slow network op");
             Helpers.sleepMillis(2000);
 
@@ -50,10 +77,10 @@ public class Part07Schedulers implements BaseTestObservables {
             subscriber.onNext(1);
 
             subscriber.onComplete();
-        }, BackpressureStrategy.BUFFER);
+        });
         observable = observable.subscribeOn(Schedulers.io()) //Specify execution on the IO Scheduler
                 .map(val -> {
-                    int newValue = val * 2;
+                    int newValue = val * 10;
                     log.info("Mapping new val {}", newValue);
                     return newValue;
                 });

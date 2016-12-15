@@ -174,11 +174,11 @@ public class Part01CreateFlowable implements BaseTestObservables {
      * In the following example we'd expect to have an infinite stream, but because we stop if there are no active
      * subscribers we stop producing events.
      * The take() operator unsubscribes from the Observable after it's received the specified amount of events
+     * while in the same time calling onComplete() downstream.
      */
     @Test
     public void showUnsubscribeObservable() {
         Observable<Integer> observable = Observable.create(subscriber -> {
-
             int i = 1;
             while(true) {
                 if(subscriber.isDisposed()) {
@@ -192,6 +192,7 @@ public class Part01CreateFlowable implements BaseTestObservables {
 
         observable
                 .take(5)
+                .map(val -> "*" + val + "*")
                 .subscribe(
                         val -> log.info("Subscriber received: {}", val),
                         err -> log.error("Subscriber received error", err),

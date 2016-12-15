@@ -145,7 +145,7 @@ Flowable<String> stream = Flowable.defer(() -> Flowable.just(blockingOperation()
 stream.subscribe(val -> log.info("Val " + val)); //only now the code inside defer() is executed
 ```
 
-### Multiple subscriptions to the same Flowable 
+### Multiple subscriptions to the same Observable / Flowable 
 When subscribing to an Observable/Flowable, the create() method gets executed for each subscription this means that the events 
 inside create are re-emitted to each subscriber. 
 
@@ -191,11 +191,19 @@ will output
 [main] - Second Subscriber received: 2
 ```
 
-### Checking if there are any active subscribers 
+### Observable / Flowable lifecycle
 Inside the create() method, we can check is there are still active subscribers to our Flowable/Observable.
 It's a way to prevent to do extra work(like for ex. querying a datasource for entries) if no one is listening
 In the following example we'd expect to have an infinite stream, but because we stop if there are no active subscribers, we stop producing events.
-The **take()** operator unsubscribes from the Observable after it's received the specified amount of events.
+
+As seen above the code inside create doesn't execute the code inside _.create(() -> {...})_ until we subscribed.   
+
+**take(limit)** is a simple operator. It's role is to count the number of events and then unsubscribe from the source.
+
+It's important to understand that events are passed from the Observable/Flowable to the operator chain. 
+
+For our 
+ unsubscribes from the Observable after it's received the specified amount of events.
 
 ```
 Observable<Integer> observable = Observable.create(subscriber -> {
@@ -219,6 +227,7 @@ observable
                //is triggered by 'take()' operator
 
 ```
+
 
 
 ## Simple Operators
