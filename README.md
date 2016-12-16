@@ -371,17 +371,21 @@ Even if the 'isUserBlockedStream' finishes after 200ms, 'userCreditScoreStream' 
 the 'zip' method applies the combining function(new Pair(x,y)) after it received both values and passes it 
 to the subscriber.
 
+
 Another good example of 'zip' is to slow down a stream by another basically **implementing a periodic emitter of events**:
+
 ```  
 Flowable<String> colors = Flowable.just("red", "green", "blue");
 Flowable<Long> timer = Flowable.interval(2, TimeUnit.SECONDS);
 
 Flowable<String> periodicEmitter = Flowable.zip(colors, timer, (key, val) -> key);
 ```
+
 Since the zip operator needs a pair of events, the slow stream will work like a timer by periodically emitting 
 with zip setting the pace of emissions downstream every 2 seconds.
 
-**Zip is not limited to just two streams**, it can merge 2,3,4,.. streams and wait for groups of 2,3,4 'pairs' of events which it combines with the zip function and sends downstream.
+**Zip is not limited to just two streams**, it can merge 2,3,4,.. streams and wait for groups of 2,3,4 'pairs' of 
+events which it combines with the zip function and sends downstream.
 
 ### merge
 Merge operator combines one or more stream and passes events downstream as soon as they appear.
@@ -505,17 +509,22 @@ We use a simulated remote call that might return asynchronous as many events as 
 ```
 
 If we have a stream of color names:
+
 ```
 Observable<String> colors = Observable.just("orange", "red", "green")
 ```
+
 to invoke the remote operation: 
+
 ```
 Observable<String> colors = Observable.just("orange", "red", "green")
          .flatMap(colorName -> simulateRemoteOperation(colorName));
 
 colors.subscribe(val -> log.info("Subscriber received: {}", val));         
 ```
+
 returns
+
 ```
 16:44:15 [Thread-0]- Subscriber received: orange0
 16:44:15 [Thread-2]- Subscriber received: green0
@@ -539,12 +548,15 @@ you can say how many of the substreams should be subscribed "concurrently" - aka
 event is triggered on the substreams.
 
 By setting the concurrency to **1** we don't subscribe to other substreams until the current one finishes:
+
 ```
 Observable<String> colors = Observable.just("orange", "red", "green")
                      .flatMap(val -> simulateRemoteOperation(val), 1); //
 
 ```
+
 Notice now there is a sequence from each color before the next one appears
+
 ```
 17:15:24 [Thread-0]- Subscriber received: orange0
 17:15:24 [Thread-0]- Subscriber received: orange1
@@ -566,6 +578,7 @@ There is actually an operator which is basically this flatMap with 1 concurrency
 
 
 Inside the flatMap we can operate on the substream with the same stream operators
+
 ```
 Observable<Pair<String, Integer>> colorsCounted = colors
     .flatMap(colorName -> {
@@ -586,7 +599,6 @@ Exceptions are for exceptional situations.
 The Observable contract specifies that exceptions are terminal operations. 
 That means in case an error reaches the Subscriber, after invoking the 'onError' handler, it also unsubscribes:
 
-
 ```
 Observable<String> colors = Observable.just("green", "blue", "red", "yellow")
        .map(color -> {
@@ -603,6 +615,7 @@ colors.subscribe(
          () -> log.info("Subscriber completed")
 );
 ```
+
 returns:
 ```
 23:30:17 [main] INFO - Subscriber received: green*XXX
@@ -613,27 +626,30 @@ After the map() operator encounters an error it unsubscribes(cancels the subscri
 - therefore 'yellow' is not even emitted-. The error travels downstream and triggers the error handler in the subscriber.
 
 
-There are operators to deal with error flow control. 
+There are operators to deal with error flow control:
+ 
 ### onErrorReturn
 
 The 'onErrorReturn' operator replaces an exception with a value:
+
 ```
 Flowable<Integer> numbers = Flowable.just("1", "3", "a", "4", "5", "c")
                             .map(Integer::parseInt) 
                             .onErrorReturn(0);      
 subscribeWithLog(numbers);
-```
-```
+=====
 Subscriber received: 1
 Subscriber received: 3
 Subscriber received: 0
 Subscriber got Completed event
 ```
+
 Notice though how it didn't prevent map() operator from unsubscribing from the Flowable, but it did 
 trigger the normal onNext callback instead of onError in the subscriber.
 
 
 Let's introduce a more realcase scenario of a simulated remote request that might fail 
+
 ```
 private Observable<String> simulateRemoteOperation(String color) {
     return Observable.<String>create(subscriber -> {
@@ -653,20 +669,15 @@ private Observable<String> simulateRemoteOperation(String color) {
          subscriber.onCompleted();
     });
 }
-```
 
-
-
-
-```
 Flowable<String> colors = Flowable.just("green", "blue", "red", "white", "blue")
                 .flatMap(color -> simulateRemoteOperation(color))
                 .onErrorReturn(throwable -> "-blank-");
                 
 subscribeWithLog(colors);
-```
-returns:
-```
+
+============
+
 22:15:51 [main] INFO - Emitting **green**
 22:15:51 [main] INFO - Subscriber received: **green**
 22:15:51 [main] INFO - Emitting **blue**
@@ -717,7 +728,7 @@ Observable<String> colors = Observable.just("green", "blue", "red", "white", "bl
                             return fallbackRemoteOperation();
                         })
      );
-...
+
 private Observable<String> fallbackRemoteOperation() {
         return Observable.just("blank");
 }
