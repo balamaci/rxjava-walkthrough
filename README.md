@@ -1,5 +1,7 @@
 # RxJava 2.x
 
+View at [Github page](https://balamaci.github.io/rxjava-walkthrough/)
+
 also available for [reactor-core](https://github.com/balamaci/reactor-core-playground) 
 
 ## Contents 
@@ -16,18 +18,20 @@ also available for [reactor-core](https://github.com/balamaci/reactor-core-playg
 ## Reactive Streams
 Reactive Streams is a programming concept for handling asynchronous 
 data streams in a non-blocking manner while providing backpressure to stream publishers.
-It has evolved into a [specification](https://github.com/reactive-streams/reactive-streams-jvm) that is based on the concept of **Publisher<T>** and **Subscriber<T>**.
+It has evolved into a [specification](https://github.com/reactive-streams/reactive-streams-jvm) that is based on the concept of **Publisher&lt;T&gt;** and **Subscriber&lt;T&gt;**.
 A **Publisher** is the source of events **T** in the stream, and a **Subscriber** is the consumer for those events.
 A **Subscriber** subscribes to a **Publisher** by invoking a "factory method" in the Publisher that will push
-the stream items **<T>** starting a new **Subscription**:
-```
+the stream items **&lt;T&gt;** starting a new **Subscription**:
+
+```java
 public interface Publisher<T> {
     public void subscribe(Subscriber<? super T> s);
 }
 ```
 
-When the Subscriber is ready to start handling events, it signals this via a **request** to that **Subscription** 
-```
+When the Subscriber is ready to start handling events, it signals this via a **request** to that **Subscription**
+ 
+```java
 public interface Subscription {
     public void request(long n); //request n items
     public void cancel();
@@ -37,7 +41,8 @@ public interface Subscription {
 Upon receiving this signal, the Publisher begins to invoke **Subscriber::onNext(T)** for each event **T**. 
 This continues until either completion of the stream (**Subscriber::onComplete()**) 
 or an error occurs during processing (**Subscriber::onError(Throwable)**).
-```
+
+```java
 public interface Subscriber<T> {
     //signals to the Publisher to start sending events
     public void onSubscribe(Subscription s);     
@@ -51,7 +56,7 @@ public interface Subscriber<T> {
 ## Flowable, Observable
 RxJava provides more types of event publishers: 
    - **Flowable** Publisher that emits 0..N elements, and then completes successfully or with an error
-   - **Observable** like Flowables but without a backpressure strategy
+   - **Observable** like Flowables but without a backpressure strategy. They were introduced in RxJava 1.x
    
    - **Single** a specialized emitter that completes with a value successfully either an error.(doesn't have onComplete callback, instead onSuccess(val))
    - **Maybe** a specialized emitter that can complete with / without a value or complete with an error.
@@ -60,17 +65,17 @@ RxJava provides more types of event publishers:
 Code is available at [Part01CreateFlowable.java](https://github.com/balamaci/rxjava-playground/blob/master/src/test/java/com/balamaci/rx/Part01CreateFlowable.java)
 
 ### Simple operators to create Streams
-```
+```java
 Flowable<Integer> flowable = Flowable.just(1, 5, 10);
 Flowable<Integer> flowable = Flowable.range(1, 10);
-Flowable<String> flowable = Flowable.fromArray(new String[] {"red", "green", "blue", "black"});
+Flowable<String> flowable = Flowable.fromArray(new String[] {"red", "green", "blue"});
 Flowable<String> flowable = Flowable.fromIterable(List.of("red", "green", "blue"));
 ```
 
 
 ### Flowable from Future
 
-```
+```java
 CompletableFuture<String> completableFuture = CompletableFuture
             .supplyAsync(() -> { //starts a background thread the ForkJoin common pool
                     log.info("CompletableFuture work starts");  
@@ -87,13 +92,13 @@ single.subscribe(val -> log.info("Stream completed successfully : {}", val));
 
 Using **Flowable.create** to handle the actual emissions of events with the events like **onNext**, **onComplete**, **onError**
 
-When subscribing to the Flowable with flowable.subscribe(...) the lambda code inside create() gets executed.
+When subscribing to the Observable / Flowable with flowable.subscribe(...) the lambda code inside create() gets executed.
 Flowable.subscribe(...) can take 3 handlers for each type of event - onNext, onError and onCompleted.
 
 When using Observable.create you need to be aware of [backpressure](#backpressure) and that Observables created with 'create' are not BackPressure aware
 
-``` 
-Observable<Integer> observable = Observable.create(subscriber -> {
+```java 
+Observable<Integer> stream = Observable.create(subscriber -> {
     log.info("Started emitting");
 
     log.info("Emitting 1st");
@@ -102,13 +107,27 @@ Observable<Integer> observable = Observable.create(subscriber -> {
     log.info("Emitting 2nd");
     subscriber.onNext(2);
 
-    subscriber.onCompleted();
+    subscriber.onComplete();
 });
 
-observable.subscribe(
-        val -> log.info("Subscriber received: {}", val),
-        err -> log.error("Subscriber received error", err),
-        () -> log.info("Subscriber got Completed event")
+//Flowable version same Observable but with a BackpressureStrategy
+//that will be discussed separately.
+Flowable<Integer> stream = Flowable.create(subscriber -> {
+    log.info("Started emitting");
+
+    log.info("Emitting 1st");
+    subscriber.onNext(1);
+
+    log.info("Emitting 2nd");
+    subscriber.onNext(2);
+
+    subscriber.onComplete();
+}, BackpressureStrategy.MISSING);
+
+stream.subscribe(
+       val -> log.info("Subscriber received: {}", val),
+       err -> log.error("Subscriber received error", err),
+       () -> log.info("Subscriber got Completed event")
 );
 ```
 
@@ -117,7 +136,7 @@ Streams are lazy meaning that the code inside create() doesn't get executed with
 So event if we sleep for a long time inside create() method(to simulate a costly operation),
 without subscribing to this Observable the code is not executed and the method returns immediately.
 
-```
+```java
 public void observablesAreLazy() {
     Observable<Integer> observable = Observable.create(subscriber -> {
         log.info("Started emitting but sleeping for 5 secs"); //this is not executed
@@ -128,30 +147,13 @@ public void observablesAreLazy() {
 }
 ```
 
-An easy way to switch from a blocking method to a reactive Single/Flowable is to use **.defer(() -> blockingOp())**.
-
-Simply using **Flowable.just(blockingOp())** would still block, as Java needs to resolve the parameter when invoking
-**Flux.just(param)** method, so _blockingOp()_ method would still be invoked(and block).
-```
-//NOT OK
-Flowable<String> flowableBlocked = Flowable.just((blockingOp())); //blocks on this line
-```
-    
-In order to get around this problem, we can use **Flowable.defer(() -> blockingOp())** and wrap the _blockingOp()_ call inside a lambda which 
-will be invoked lazy **at subscribe time**.
-
-```
-Flowable<String> stream = Flowable.defer(() -> Flowable.just(blockingOperation())); 
-stream.subscribe(val -> log.info("Val " + val)); //only now the code inside defer() is executed
-```
-
 ### Multiple subscriptions to the same Observable / Flowable 
 When subscribing to an Observable/Flowable, the create() method gets executed for each subscription this means that the events 
 inside create are re-emitted to each subscriber. 
 
 So every subscriber will get the same events and will not lose any events - this behavior is named **'cold observable'**
 
-```
+```java
 Observable<Integer> observable = Observable.create(subscriber -> {
    log.info("Started emitting");
 
@@ -191,8 +193,44 @@ will output
 [main] - Second Subscriber received: 2
 ```
 
-### Observable / Flowable lifecycle
+## Observable / Flowable lifecycle
+
+### Operators
+Between the source Observable / Flowable and the Subscriber there can be a wide range of operators and there are lots
+of operators to chose from. Probably you are already familiar with functional operations like **filter** and **map**. 
+
+```java
+Flowable<Integer> stream = Flowable.create(subscriber -> {
+        subscriber.onNext(1);
+        subscriber.onNext(2);
+        ....
+        subscriber.onComplete();
+    }, BackpressureStrategy.MISSING);
+    .filter(val -> val < 10)
+    .map(val -> val * 10)
+    .subscribe(val -> log.info("Received: {}", val));
+```
+
+When we call _Flowable.create()_ you might think that we're was calling onNext(..), onComplete(..) the Subscriber at the end of the chain, 
+not the operators between them.
+
+This is not true because **the operators themselves are decorators for their source** wrapping it with the operator behavior. 
+Chaining the operators together looks like an onion's layers. 
+
+**Subscription propagates through the layers back to the source and triggers it to start producing/emitting items**.
+
+Flowable.create calls ---&gt; filterOperator.onNext(val) which if val &gt; 10 calls ---&gt; mapOperator.onNext(val) which does val = val * 10 calls ---&gt; subscriber.onNext(val). 
+Which looks like an analogy with a team of house movers presented [here](https://tomstechnicalblog.blogspot.ro/2015_10_01_archive.html)
+
+![Movers](https://1.bp.blogspot.com/-1RuGVz4-U9Q/VjT0AsfiiUI/AAAAAAAAAKQ/xWQaOwNtS7o/s1600/animation_2.gif) 
+ 
+Observable operators are both **Observable** and **Observer**(different classname ).  
+
+### Canceling subscription
 Inside the create() method, we can check is there are still active subscribers to our Flowable/Observable.
+
+There are operators that also unsubscribe from the stream so the source knows  
+
 It's a way to prevent to do extra work(like for ex. querying a datasource for entries) if no one is listening
 In the following example we'd expect to have an infinite stream, but because we stop if there are no active subscribers, we stop producing events.
 
@@ -205,7 +243,7 @@ It's important to understand that events are passed from the Observable/Flowable
 For our 
  unsubscribes from the Observable after it's received the specified amount of events.
 
-```
+```java
 Observable<Integer> observable = Observable.create(subscriber -> {
 
     int i = 1;
@@ -216,7 +254,8 @@ Observable<Integer> observable = Observable.create(subscriber -> {
 
         subscriber.onNext(i++);
     }
-    //subscriber.onCompleted(); too late to emit Complete event since subscriber already unsubscribed
+    //subscriber.onCompleted(); too late to emit Complete event 
+    //since subscriber already unsubscribed
 });
 
 observable
@@ -229,20 +268,21 @@ observable
 ```
 
 
-
 ## Simple Operators
 Code is available at [Part02SimpleOperators.java](https://github.com/balamaci/rxjava-playground/blob/master/src/test/java/com/balamaci/rx/Part02SimpleOperators.java)
 
 ### interval
 Periodically emits a number starting from 0 and then increasing the value on each emission.
-```
+
+```java
 log.info("Starting");
 Flowable.interval(5, TimeUnit.SECONDS)
        .take(4)
        .subscribe(tick -> log.info("Tick {}", tick),
                   (ex) -> log.info("Error emitted"),
                   () -> log.info("Completed"));
-//results
+
+==========
 22:27:44 [main] - Starting
 22:27:49 [main] - Tick 0
 22:27:54 [main] - Tick 1
@@ -261,16 +301,15 @@ Takes an **initial value** and a **function(accumulator, currentValue)**. It goe
 sequence and combines the current event value with the previous result(accumulator) emitting downstream the function's
 result for each event(the initial value is used for the first event)
 
-```
+```java
 Flowable<Integer> numbers = 
                 Flowable.just(3, 5, -2, 9)
                     .scan(0, (totalSoFar, currentValue) -> {
                                log.info("TotalSoFar={}, currentValue={}", totalSoFar, currentValue);
                                return totalSoFar + currentValue;
                     });
-```
 
-```
+=============
 16:09:17 [main] - Subscriber received: 0
 16:09:17 [main] - TotalSoFar=0, currentValue=3
 16:09:17 [main] - Subscriber received: 3
@@ -287,15 +326,14 @@ Flowable<Integer> numbers =
 reduce operator acts like the scan operator but it only passes downstream the final result 
 (doesn't pass the intermediate results downstream) so the subscriber receives just one event
 
-```
+```java
 Flowable<Integer> numbers = Flowable.just(3, 5, -2, 9)
                             .reduce(0, (totalSoFar, val) -> {
                                          log.info("totalSoFar={}, emitted={}", totalSoFar, val);
                                          return totalSoFar + val;
                             });
-```
-
-```
+                            
+=============                            
 17:08:29 [main] - totalSoFar=0, emitted=3
 17:08:29 [main] - totalSoFar=3, emitted=5
 17:08:29 [main] - totalSoFar=8, emitted=-2
@@ -310,15 +348,14 @@ which returns a value, the _collect_ operator takes a container supplier and a f
 anything(a consumer). The mutable container is passed for every event and thus you get a chance to modify it
 in this collect consumer function.
 
-```
+```java
 Flowable<List<Integer>> numbers = Flowable.just(3, 5, -2, 9)
                                         .collect(ArrayList::new, (container, value) -> {
                                             log.info("Adding {} to container", value);
                                             container.add(value);
                                             //notice we don't need to return anything
                                         });
-```
-```
+=========
 17:40:18 [main] - Adding 3 to container
 17:40:18 [main] - Adding 5 to container
 17:40:18 [main] - Adding -2 to container
@@ -328,6 +365,25 @@ Flowable<List<Integer>> numbers = Flowable.just(3, 5, -2, 9)
 ```
 
 because the usecase to store to a List container is so common, there is a **.toList()** operator that is just a collector adding to a List. 
+
+### defer
+An easy way to switch from a blocking method to a reactive Single/Flowable is to use **.defer(() -> blockingOp())**.
+
+Simply using **Flowable.just(blockingOp())** would still block, as Java needs to resolve the parameter when invoking
+**Flux.just(param)** method, so _blockingOp()_ method would still be invoked(and block).
+
+```java
+//NOT OK
+Flowable<String> flowableBlocked = Flowable.just((blockingOp())); //blocks on this line
+```
+    
+In order to get around this problem, we can use **Flowable.defer(() -> blockingOp())** and wrap the _blockingOp()_ call inside a lambda which 
+will be invoked lazy **at subscribe time**.
+
+```java
+Flowable<String> stream = Flowable.defer(() -> Flowable.just(blockingOperation())); 
+stream.subscribe(val -> log.info("Val " + val)); //only now the code inside defer() is executed
+```
 
 
 ## Merging Streams
@@ -348,7 +404,7 @@ of the zipped streams once each has emitted a value.
 Zip operator besides the streams to zip, also takes as parameter a function which will produce the 
 combined result of the zipped streams once each stream emitted it's value
 
-```
+```java
 Single<Boolean> isUserBlockedStream = 
                     Single.fromFuture(CompletableFuture.supplyAsync(() -> {
                             Helpers.sleepMillis(200);
@@ -361,12 +417,12 @@ Single<Integer> userCreditScoreStream =
                             return 5;
                     }));
 
-Single<Pair<Boolean, Integer>> userCheckStream = Single.
-           zip(isUserBlockedStream, userCreditScoreStream, 
+Single<Pair<Boolean, Integer>> userCheckStream = Single.zip(isUserBlockedStream, userCreditScoreStream, 
                       (blocked, creditScore) -> new Pair<Boolean, Integer>(blocked, creditScore));
 
 userCheckStream.subscribe(pair -> log.info("Received " + pair));
 ```
+
 Even if the 'isUserBlockedStream' finishes after 200ms, 'userCreditScoreStream' is slow at 2.3secs, 
 the 'zip' method applies the combining function(new Pair(x,y)) after it received both values and passes it 
 to the subscriber.
@@ -374,7 +430,7 @@ to the subscriber.
 
 Another good example of 'zip' is to slow down a stream by another basically **implementing a periodic emitter of events**:
 
-```  
+```java  
 Flowable<String> colors = Flowable.just("red", "green", "blue");
 Flowable<Long> timer = Flowable.interval(2, TimeUnit.SECONDS);
 
@@ -397,9 +453,8 @@ Flowable<String> colors = periodicEmitter("red", "green", "blue", 2, TimeUnit.SE
 Flowable<Long> numbers = Flowable.interval(1, TimeUnit.SECONDS)
                 .take(5);
 Flowable flowable = Flowable.merge(colors, numbers);                
-```
 
-```
+============
 21:32:15 - Subscriber received: 0
 21:32:16 - Subscriber received: red
 21:32:16 - Subscriber received: 1
@@ -414,16 +469,15 @@ Flowable flowable = Flowable.merge(colors, numbers);
 Concat operator appends another streams at the end of another
 ![concat](https://raw.githubusercontent.com/reactor/projectreactor.io/master/src/main/static/assets/img/marble/concat.png)
 
-```
+```java
 Flowable<String> colors = periodicEmitter("red", "green", "blue", 2, TimeUnit.SECONDS);
 
 Flowable<Long> numbers = Flowable.interval(1, TimeUnit.SECONDS)
                 .take(4);
 
 Flowable events = Flowable.concat(colors, numbers);
-```
 
-```
+==========
 22:48:23 - Subscriber received: red
 22:48:25 - Subscriber received: green
 22:48:27 - Subscriber received: blue
@@ -475,24 +529,26 @@ these Streams back as coming from a single stream.
 Why this looks like fork-join because for each element you can fork some jobs that keeps emitting results,
 and these results are emitted back as elements to the subscribers downstream
 
-Rules of thumb to consider before getting comfortable with flatMap: 
+**Rules of thumb** to consider before getting comfortable with flatMap: 
    
    - When you have an 'item' and you'll get Observable&lt;X&gt;, instead of X, you need flatMap. Most common example is when you want 
    to make a remote call that returns an Observable. For ex if you have a stream of customerIds, and downstream you
     want to work with actual Customer objects:
-   ```   
-   Observable<Customer> getCustomer(Integer customerId) {..}
-    ...
+    
+    ```java   
+    Observable<Customer> getCustomer(Integer customerId) {..}
+        ...
    
-   Observable<Integer> customerIds = Observable.of(1,2,3,4);
-   Observable<Customer> customers = customerIds
+    Observable<Integer> customerIds = Observable.of(1,2,3,4);
+    Observable<Customer> customers = customerIds
                                         .flatMap(customerId -> getCustomer(customerId));
-   ```
+    ```
    
    - When you have Observable&lt;Observable&lt;T&gt;&gt; you probably need flatMap.
 
-We use a simulated remote call that might return asynchronous as many events as the length of the color string
-```
+    We use a simulated remote call that might return asynchronous as many events as the length of the color string
+
+    ```java
     private Observable<String> simulateRemoteOperation(String color) {
         return Observable.<String>create(subscriber -> {
                     Runnable asyncRun = () -> {
@@ -506,26 +562,23 @@ We use a simulated remote call that might return asynchronous as many events as 
                     new Thread(asyncRun).start();
                 });
     }
-```
+    ```
 
 If we have a stream of color names:
 
-```
+```java
 Observable<String> colors = Observable.just("orange", "red", "green")
 ```
 
 to invoke the remote operation: 
 
-```
+```java
 Observable<String> colors = Observable.just("orange", "red", "green")
          .flatMap(colorName -> simulateRemoteOperation(colorName));
 
 colors.subscribe(val -> log.info("Subscriber received: {}", val));         
-```
 
-returns
-
-```
+====
 16:44:15 [Thread-0]- Subscriber received: orange0
 16:44:15 [Thread-2]- Subscriber received: green0
 16:44:15 [Thread-1]- Subscriber received: red0
@@ -579,7 +632,7 @@ There is actually an operator which is basically this flatMap with 1 concurrency
 
 Inside the flatMap we can operate on the substream with the same stream operators
 
-```
+```java
 Observable<Pair<String, Integer>> colorsCounted = colors
     .flatMap(colorName -> {
                Observable<Long> timer = Observable.interval(2, TimeUnit.SECONDS);
@@ -599,7 +652,7 @@ Exceptions are for exceptional situations.
 The Observable contract specifies that exceptions are terminal operations. 
 That means in case an error reaches the Subscriber, after invoking the 'onError' handler, it also unsubscribes:
 
-```
+```java
 Observable<String> colors = Observable.just("green", "blue", "red", "yellow")
        .map(color -> {
               if ("red".equals(color)) {
@@ -632,7 +685,7 @@ There are operators to deal with error flow control:
 
 The 'onErrorReturn' operator replaces an exception with a value:
 
-```
+```java
 Flowable<Integer> numbers = Flowable.just("1", "3", "a", "4", "5", "c")
                             .map(Integer::parseInt) 
                             .onErrorReturn(0);      
@@ -650,7 +703,7 @@ trigger the normal onNext callback instead of onError in the subscriber.
 
 Let's introduce a more realcase scenario of a simulated remote request that might fail 
 
-```
+```java
 private Observable<String> simulateRemoteOperation(String color) {
     return Observable.<String>create(subscriber -> {
          if ("red".equals(color)) {
@@ -690,7 +743,7 @@ flatMap encounters an error when it subscribes to 'red' substreams and thus stil
 stream and the remaining colors are not longer emitted
 
 
-```
+```java
 Flowable<String> colors = Flowable.just("green", "blue", "red", "white", "blue")
                 .flatMap(color -> simulateRemoteOperation(color)
                                     .onErrorReturn(throwable -> "-blank-")
@@ -718,7 +771,7 @@ returns:
 onErrorResumeNext() returns a stream instead of an exception, useful for example to invoke a fallback 
 method that returns also a stream
 
-```
+```java
 Observable<String> colors = Observable.just("green", "blue", "red", "white", "blue")
      .flatMap(color -> simulateRemoteOperation(color)
                         .onErrorResumeNext(th -> {
@@ -770,7 +823,7 @@ returns
 ```
 
 When you want to retry considering the thrown exception type:
-```
+```java
 Observable<String> colors = Observable.just("blue", "red", "black", "yellow")
          .flatMap(colorName -> simulateRemoteOperation(colorName)
                 .retry((retryAttempt, exception) -> {
@@ -814,7 +867,7 @@ however we want to wait a little before retrying so in the zip function we retur
 
 The delay also needs to be subscribed to be effected so we also flatMap
 
-```
+```java
 Observable<String> colors = Observable.just("blue", "green", "red", "black", "yellow");
 
 colors.flatMap(colorName -> 
@@ -861,7 +914,7 @@ With similar names it worth noting the difference.
    - retry() resubscribes when it receives onError().
    
 Example using repeatWhen() to implement periodic polling
-```
+```java
 remoteOperation.repeatWhen(completed -> completed
                                      .delay(2, TimeUnit.SECONDS))                                                       
 ```
@@ -877,7 +930,7 @@ it can consume and so to produce only that amount.
 The [reactive-streams](https://github.com/reactive-streams/reactive-streams-jvm) section above we saw that besides the onNext, onError and onComplete handlers, the Subscriber
 has an **onSubscribe(Subscription)**
 
-```
+```java
 public interface Subscriber<T> {
     //signals to the Publisher to start sending events
     public void onSubscribe(Subscription s);     
@@ -891,7 +944,7 @@ public interface Subscriber<T> {
 Subscription through which it can signal upstream it's ready to receive a number of items and after it
 processes the items request another batch.
 
-```
+```java
 public interface Subscription {
     public void request(long n); //request n items
     public void cancel();
@@ -903,7 +956,7 @@ until now we did not see a custom **onSubscribe** request being implemented. Thi
 there is a default implementation which requests of Long.MAX_VALUE which basically means "send all you have".
 
 Neither did we see the code in the producer that takes consideration of the number of items requested by the subscriber. 
-```
+```java
 Flowable.create(subscriber -> {
       log.info("Started emitting");
 

@@ -118,7 +118,7 @@ public class Part01CreateFlowable implements BaseTestObservables {
             subscriber.onNext(2);
         });
 
-        observable.subscribe(
+        Disposable disposable = observable.subscribe(
                 val -> log.info("Subscriber received: {}", val),
                 err -> log.error("Subscriber received error", err),
                 () -> log.info("Subscriber got Completed event")
