@@ -147,7 +147,7 @@ public class Part04HotPublishers implements BaseTestObservables {
      * ConnectableObservable
      */
     @Test
-    public void connectableObservable() {
+    public void connectableFlowable() {
         Observable<Integer> connectableFlowable = Observable.<Integer>create(subscriber -> {
             log.info("Inside create()");
             ResourceConnectionHandler resourceConnectionHandler = new ResourceConnectionHandler() {

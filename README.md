@@ -9,6 +9,7 @@ also available for [reactor-core](https://github.com/balamaci/reactor-core-playg
    - [Flowable, Single and Observable](#flowable)
    - [Simple Operators](#simple-operators)
    - [Merging Streams](#merging-streams)
+   - [Hot Publishers](#hot-publishers)
    - [FlatMap Operator](#flatmap-operator)
    - [Schedulers](#schedulers)
    - [Error Handling](#error-handling)
@@ -53,7 +54,7 @@ public interface Subscriber<T> {
 }
 ```
 
-## Flowable, Observable
+## Flowable and Observable
 RxJava provides more types of event publishers: 
    - **Flowable** Publisher that emits 0..N elements, and then completes successfully or with an error
    - **Observable** like Flowables but without a backpressure strategy. They were introduced in RxJava 1.x
@@ -296,7 +297,8 @@ result for each event(the initial value is used for the first event)
 Flowable<Integer> numbers = 
                 Flowable.just(3, 5, -2, 9)
                     .scan(0, (totalSoFar, currentValue) -> {
-                               log.info("TotalSoFar={}, currentValue={}", totalSoFar, currentValue);
+                               log.info("TotalSoFar={}, currentValue={}", 
+                                            totalSoFar, currentValue);
                                return totalSoFar + currentValue;
                     });
 
@@ -483,6 +485,11 @@ before we see any 'numbers'.
 This is because 'numbers' stream is actually subscribed only after the 'colors' complete.
 Should the second stream be a 'hot' emitter, its events would be lost until the first one finishes
 and the seconds stream is subscribed.
+
+## Hot Publishers
+We've seen that with 'cold publishers', whenever a subscriber subscribes, each subscriber will get
+it's version of emitted values independently
+
 
 
 ## Schedulers
@@ -966,7 +973,8 @@ Looks like it's not possible to slow down production based on request(as there i
 we can at most stop production if the subscriber canceled subscription. 
 
 This can be done if we extend Flowable so we can pass our custom Subscription type to the downstream subscriber:
-```
+
+```java
 private class CustomRangeFlowable extends Flowable<Integer> {
 
         private int startFrom;
@@ -1033,7 +1041,7 @@ private class CustomRangeFlowable extends Flowable<Integer> {
 Now lets see how we can custom control how many items we request from upstream, to simulate an initial big request, 
 and then a request for other smaller batches of items as soon as the subscriber finishes and is ready for another batch.
   
-```
+```java
 Flowable<Integer> flowable = new CustomRangeFlowable(5, 10);
 
 flowable.subscribe(new Subscriber<Integer>() {
@@ -1095,7 +1103,8 @@ Subscriber completed
 
 Returning to the _Flowable.create()_ example since it's not taking any account of the requested 
 items by the subscriber, does it mean it might overwhelm a slow Subscriber? 
-```
+
+```java
 private Flowable<Integer> createFlowable(int items,
                      BackpressureStrategy backpressureStrategy) {
 
@@ -1220,7 +1229,8 @@ Notice however
 
 Chaining together multiple onBackpressureXXX operators doesn't actually make sense
 Using something like
-```
+
+```java
 Flowable<Integer> flowable = createFlowable(10, BackpressureStrategy.MISSING)
                  .onBackpressureBuffer(5)
                  .onBackpressureDrop((val) -> log.info("Dropping {}", val))
@@ -1229,15 +1239,16 @@ flowable = flowable
                  
 subscribeWithSlowSubscriber(flowable);
 ```
-is not behaving as maybe you'd expected - buffer 5 values, and then dropping overflowing events-.
+
+is not behaving as probably you'd expected - buffer 5 values, and then dropping overflowing events-.
 Because _onBackpressureDrop_ subscribes to the previous _onBackpressureBuffer_ operator
 signaling it's requesting **Long.MAX_VALUE**(unbounded amount) from it. 
-Thus onBackpressureBuffer will never feel its subscriber is overwhelmed and never "trigger", meaning that the last 
+Thus **onBackpressureBuffer** will never feel its subscriber is overwhelmed and never "trigger", meaning that the last 
 onBackpressureXXX operator overrides the previous one if they are chained.
 
 Of course for implementing an event dropping strategy after a full buffer, there is the special overrided
-version of onBackpressureBuffer that takes a **BackpressureOverflowStrategy**.
-```
+version of **onBackpressureBuffer** that takes a **BackpressureOverflowStrategy**.
+```java
 Flowable<Integer> flowable = createFlowable(10, BackpressureStrategy.MISSING)
                 .onBackpressureBuffer(5, () -> log.info("Buffer has overflown"),
                                             BackpressureOverflowStrategy.DROP_OLDEST);
@@ -1272,10 +1283,10 @@ subscribeWithSlowSubscriber(flowable);
 [RxCachedThreadScheduler-1] - Subscriber got Completed event
 ```
 
-
 onBackpressureXXX operators can be added whenever necessary and it's not limited to cold publishers and we can use them 
 on hot publishers also.
 
-## Articles and books further reading
+## Articles and books for further reading
 [Reactive Programming with RxJava](http://shop.oreilly.com/product/0636920042228.do)
+
   
