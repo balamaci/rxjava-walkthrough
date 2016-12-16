@@ -211,37 +211,30 @@ Flowable<Integer> stream = Flowable.create(subscriber -> {
     .subscribe(val -> log.info("Received: {}", val));
 ```
 
-When we call _Flowable.create()_ you might think that we're was calling onNext(..), onComplete(..) the Subscriber at the end of the chain, 
+When we call _Flowable.create()_ you might think that we're calling onNext(..), onComplete(..) the Subscriber at the end of the chain, 
 not the operators between them.
 
-This is not true because **the operators themselves are decorators for their source** wrapping it with the operator behavior. 
-Chaining the operators together looks like an onion's layers. 
+This is not true because **the operators themselves are decorators for their source** wrapping it with the operator behavior 
+like an onion's layers. 
 
 **Subscription propagates through the layers back to the source and triggers it to start producing/emitting items**.
 
-Flowable.create calls ---&gt; filterOperator.onNext(val) which if val &gt; 10 calls ---&gt; mapOperator.onNext(val) which does val = val * 10 calls ---&gt; subscriber.onNext(val). 
-Which looks like an analogy with a team of house movers presented [here](https://tomstechnicalblog.blogspot.ro/2015_10_01_archive.html)
+**Flowable.create** calls **---&gt; filterOperator.onNext(val)** which if val &gt; 10 calls **---&gt; 
+mapOperator.onNext(val)** which does val = val * 10 calls **---&gt; subscriber.onNext(val)**. 
+
+An analogy with a team of house movers was proposed [here](https://tomstechnicalblog.blogspot.ro/2015_10_01_archive.html)
 
 ![Movers](https://1.bp.blogspot.com/-1RuGVz4-U9Q/VjT0AsfiiUI/AAAAAAAAAKQ/xWQaOwNtS7o/s1600/animation_2.gif) 
  
-Observable operators are both **Observable** and **Observer**(different classname ).  
-
 ### Canceling subscription
 Inside the create() method, we can check is there are still active subscribers to our Flowable/Observable.
 
-There are operators that also unsubscribe from the stream so the source knows  
-
+There are operators that also unsubscribe from the stream so the source knows to stop producing events.  
 It's a way to prevent to do extra work(like for ex. querying a datasource for entries) if no one is listening
-In the following example we'd expect to have an infinite stream, but because we stop if there are no active subscribers, we stop producing events.
+In the following example we'd expect to have an infinite stream, but because we stop if there are no active subscribers, we stop producing events.   
 
-As seen above the code inside create doesn't execute the code inside _.create(() -> {...})_ until we subscribed.   
-
-**take(limit)** is a simple operator. It's role is to count the number of events and then unsubscribe from the source.
-
-It's important to understand that events are passed from the Observable/Flowable to the operator chain. 
-
-For our 
- unsubscribes from the Observable after it's received the specified amount of events.
+**take(limit)** is a simple operator. It's role is to count the number of events and then unsubscribes from it's source 
+once it received the specified amount and calls onComplete() to it's subscriber.
 
 ```java
 Observable<Integer> observable = Observable.create(subscriber -> {
@@ -254,8 +247,6 @@ Observable<Integer> observable = Observable.create(subscriber -> {
 
         subscriber.onNext(i++);
     }
-    //subscriber.onCompleted(); too late to emit Complete event 
-    //since subscriber already unsubscribed
 });
 
 observable
