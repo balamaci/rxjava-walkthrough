@@ -221,9 +221,10 @@ like an onion's layers.
 **Subscription propagates through the layers back to the source and triggers it to start producing/emitting items**.
 
 **Flowable.create** calls **---&gt; filterOperator.onNext(val)** which if val &gt; 10 calls **---&gt; 
-mapOperator.onNext(val)** which does val = val * 10 calls **---&gt; subscriber.onNext(val)**. 
+mapOperator.onNext(val)** does val = val * 10 and calls **---&gt; subscriber.onNext(val)**. 
 
-An analogy with a team of house movers was proposed [here](https://tomstechnicalblog.blogspot.ro/2015_10_01_archive.html)
+[Found] a nice analogy with a team of house movers, with every mover doing it's thing before passing it to the next in line 
+until it reaches the final subscriber.
 
 ![Movers](https://1.bp.blogspot.com/-1RuGVz4-U9Q/VjT0AsfiiUI/AAAAAAAAAKQ/xWQaOwNtS7o/s1600/animation_2.gif) 
  
@@ -488,8 +489,126 @@ and the seconds stream is subscribed.
 
 ## Hot Publishers
 We've seen that with 'cold publishers', whenever a subscriber subscribes, each subscriber will get
-it's version of emitted values independently
+it's version of emitted values independently, the exact set of data indifferently when they subscribe.
+But cold publishers only pump data when the subscribers subscribes, however there are cases where 
+the events happen independently from the consumers regardless if someone is 
+listening or not and we don't have control to request more.  
 
+### Subjects
+Subjects are one way to handle hot observables. Subjects keep reference to their subscribers and allow 'multicasting' 
+an event to them.
+```java
+for (Disposable<T> s : subscribers.get()) {
+    s.onNext(t);
+}
+```
+
+Subjects besides being traditional Observables you can use the same operators and subscribe to them,
+are also an **Observer**(interface like Subscriber, implementing the 3 methods **onNext, onError, onComplete**), meaning you can invoke subject.onNext(value) from different parts in the code,
+which means that you publish events which the Subject will pass on to their subscribers.
+
+```java
+Subject<Integer> subject = ReplaySubject.create()
+                     .map(...);
+                     .subscribe(); //
+
+...
+subject.onNext(val);
+...
+subject.onNext(val2);
+```
+remember for 
+```java
+Observable.create(subscriber -> {
+      subscriber.onNext(val);
+})
+```
+### ConnectableObservable
+There are cases when we want to . One such scenario might . 
+
+### ConnectableObservable and resource sharing
+Another very useful usecase is that of resource sharing, for ex. when we want to share a connection
+between multiple Observables / Flowables. 
+Using a plain Observable would reexecute the code inside .create()
+and opening / closing a new connection for each Subscriber when it subscribes / cancels it's subscription.
+This is where the **share()** operator is useful. It basically keeps a count of references of it's subscribers
+and executes the code inside create() just for the first subscriber but multicasts the same event to each active subscriber. 
+When the last subscriber unsubscribes in triggers any unsubscription callback associated with the ConnectableObservable.   
+
+```java
+ConnectableObservable<Integer> connectableStream = Observable.<Integer>create(subscriber -> {
+   log.info("Inside create()");
+   
+   //Simulated MessageListener emits periodically every 500 milliseconds
+   ResourceConnectionHandler resourceConnectionHandler = new ResourceConnectionHandler() {
+        @Override
+        public void onMessage(Integer message) {
+             log.info("Emitting {}", message);
+             subscriber.onNext(message);
+        }
+   };
+   resourceConnectionHandler.connect();
+
+   //when the last subscriber unsubscribes it will invoke disconnect on the resourceConnectionHandler
+   subscriber.setCancellable(resourceConnectionHandler::disconnect);
+}).share(); 
+
+connectableStream
+      .take(5)
+      .subscribe((val) -> log.info("Subscriber1 received: {}", val), logError(), logComplete());
+
+Helpers.sleepMillis(1000);
+
+log.info("Subscribing 2nd");
+//we're not seing 
+connectableStream
+      .take(2)
+      .subscribe((val) -> log.info("Subscriber2 received: {}", val), logError(), logComplete());
+
+
+private abstract class ResourceConnectionHandler {
+
+   ScheduledExecutorService scheduledExecutorService;
+
+   private int counter;
+
+   public void connect() {
+      log.info("**Opening connection");
+
+      scheduledExecutorService = periodicEventEmitter(() -> {
+            counter ++;
+            onMessage(counter);
+      }, 500, TimeUnit.MILLISECONDS);
+   }
+
+   public abstract void onMessage(Integer message);
+
+   public void disconnect() {
+      log.info("**Shutting down connection");
+      scheduledExecutorService.shutdown();
+   }
+}
+
+===============
+23:07:08 [main] - Inside create()
+23:07:08 [main] - **Opening connection
+23:07:08 [pool-1-thread-1] - Emitting 1
+23:07:08 [pool-1-thread-1] - Subscriber1 received: 1
+23:07:08 [pool-1-thread-1] - Emitting 2
+23:07:08 [pool-1-thread-1] - Subscriber1 received: 2
+23:07:09 [pool-1-thread-1] - Emitting 3
+23:07:09 [pool-1-thread-1] - Subscriber1 received: 3
+23:07:09 [main] - Subscribing 2nd
+23:07:09 [pool-1-thread-1] - Emitting 4
+23:07:09 [pool-1-thread-1] - Subscriber1 received: 4
+23:07:09 [pool-1-thread-1] - Subscriber2 received: 4
+23:07:10 [pool-1-thread-1] - Emitting 5
+23:07:10 [pool-1-thread-1] - Subscriber1 received: 5
+23:07:10 [pool-1-thread-1] - Subscriber got Completed event
+23:07:10 [pool-1-thread-1] - Subscriber2 received: 5
+23:07:10 [pool-1-thread-1] - **Shutting down connection
+23:07:10 [pool-1-thread-1] - Subscriber got Completed event
+```
 
 
 ## Schedulers

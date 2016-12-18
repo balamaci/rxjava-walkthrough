@@ -47,10 +47,11 @@ public class Part02SimpleOperators implements BaseTestObservables {
     }
 
 
+
     @Test
     public void delayOperatorWithVariableDelay() {
         log.info("Starting");
-        Flowable flowable = Flowable.range(0, 5)
+        Flowable<Integer> flowable = Flowable.range(0, 5)
                                     .doOnNext(val -> log.info("Emitted {}", val))
                                     .delay(val -> Flowable.timer(val * 2, TimeUnit.SECONDS));
         subscribeWithLogWaiting(flowable);
@@ -120,7 +121,7 @@ public class Part02SimpleOperators implements BaseTestObservables {
      */
     @Test
     public void repeat() {
-        Flowable random = Flowable.defer(() -> {
+        Flowable<Integer> random = Flowable.defer(() -> {
                                 Random rand = new Random();
                                 return Flowable.just(rand.nextInt(20));
                             })

@@ -2,6 +2,7 @@ package com.balamaci.rx;
 
 import com.balamaci.rx.util.Helpers;
 import io.reactivex.Observable;
+import io.reactivex.observables.ConnectableObservable;
 import io.reactivex.subjects.PublishSubject;
 import io.reactivex.subjects.ReplaySubject;
 import io.reactivex.subjects.Subject;
@@ -60,8 +61,8 @@ public class Part04HotPublishers implements BaseTestObservables {
     public void replaySubject() {
         Subject<Integer> subject = ReplaySubject.createWithSize(50);
 
-        Runnable pushAction = pushEventsToSubjectAction(subject);
-        periodicEventEmitter(pushAction);
+        Runnable pushAction = pushEventsToSubjectAction(subject, 10);
+        periodicEventEmitter(pushAction, 500, TimeUnit.MILLISECONDS);
 
         Helpers.sleepMillis(1000);
         CountDownLatch latch = new CountDownLatch(2);
@@ -90,7 +91,7 @@ public class Part04HotPublishers implements BaseTestObservables {
             log.info("Emitted {}", counter);
             subject.onNext(counter);
         };
-        periodicEventEmitter(action);
+        periodicEventEmitter(action, 500, TimeUnit.MILLISECONDS);
 
         Helpers.sleepMillis(1000);
         log.info("Subscribing 1st");
@@ -129,26 +130,12 @@ public class Part04HotPublishers implements BaseTestObservables {
         Helpers.wait(latch);
     }
 
-    private Runnable pushEventsToSubjectAction(Subject<Integer> subject) {
-        return () -> {
-            if(counter == 10) {
-                subject.onComplete();
-                return;
-            }
-
-            counter ++;
-
-            log.info("Emitted {}", counter);
-            subject.onNext(counter);
-        };
-    }
-
     /**
      * ConnectableObservable
      */
     @Test
-    public void connectableFlowable() {
-        Observable<Integer> connectableFlowable = Observable.<Integer>create(subscriber -> {
+    public void sharingResourcesBetweenObservablesWithConnectableObservable() {
+        Observable<Integer> connectableObservable = Observable.<Integer>create(subscriber -> {
             log.info("Inside create()");
             ResourceConnectionHandler resourceConnectionHandler = new ResourceConnectionHandler() {
                 @Override
@@ -160,28 +147,71 @@ public class Part04HotPublishers implements BaseTestObservables {
             resourceConnectionHandler.connect();
 
             subscriber.setCancellable(resourceConnectionHandler::disconnect);
-        }).publish().refCount(); // share() operator
+        }).share();
+//        }).publish().refCount(); // publish().refCount() equals share()
 
         CountDownLatch latch = new CountDownLatch(2);
-        connectableFlowable
-                .take(4)
+        connectableObservable
+                .take(5)
                 .subscribe((val) -> log.info("Subscriber1 received: {}", val), logError(), logComplete(latch));
 
         Helpers.sleepMillis(1000);
 
         log.info("Subscribing 2nd");
-        connectableFlowable
+        connectableObservable
                 .take(2)
                 .subscribe((val) -> log.info("Subscriber2 received: {}", val), logError(), logComplete(latch));
         Helpers.wait(latch);
     }
 
+    @Test
+    public void connectable() {
+        ConnectableObservable<Integer> connectableObservable = Observable.<Integer>create(subscriber -> {
+            log.info("Inside create()");
+            ResourceConnectionHandler resourceConnectionHandler = new ResourceConnectionHandler() {
+                @Override
+                public void onMessage(Integer message) {
+                    log.info("Emitting {}", message);
+                    subscriber.onNext(message);
+                }
+            };
+            resourceConnectionHandler.connect();
 
-    private ScheduledExecutorService periodicEventEmitter(Runnable action) {
+            subscriber.setCancellable(resourceConnectionHandler::disconnect);
+        }).publish();
+
+        log.info("Before subscribing");
+        CountDownLatch latch = new CountDownLatch(1);
+        connectableObservable
+                .take(4)
+                .subscribe((val) -> log.info("Subscriber1 received: {}", val), logError(), logComplete(latch));
+        log.info("After subscribing");
+
+        connectableObservable.connect();
+        Helpers.wait(latch);
+    }
+
+
+    private ScheduledExecutorService periodicEventEmitter(Runnable action,
+                                                          int period, TimeUnit timeUnit) {
         ScheduledExecutorService scheduledExecutorService = Executors.newScheduledThreadPool(1);
-        scheduledExecutorService.scheduleAtFixedRate(action, 0, 500, TimeUnit.MILLISECONDS);
+        scheduledExecutorService.scheduleAtFixedRate(action, 0, period, timeUnit);
 
         return scheduledExecutorService;
+    }
+
+    private Runnable pushEventsToSubjectAction(Subject<Integer> subject, int maxEvents) {
+        return () -> {
+            if(counter == maxEvents) {
+                subject.onComplete();
+                return;
+            }
+
+            counter ++;
+
+            log.info("Emitted {}", counter);
+            subject.onNext(counter);
+        };
     }
 
     private abstract class ResourceConnectionHandler {
@@ -191,20 +221,20 @@ public class Part04HotPublishers implements BaseTestObservables {
         private int counter;
 
         public void connect() {
-            log.info("Opening connection");
+            log.info("**Opening connection");
+
             scheduledExecutorService = periodicEventEmitter(() -> {
                 counter ++;
                 onMessage(counter);
-            });
+            }, 500, TimeUnit.MILLISECONDS);
         }
 
         public abstract void onMessage(Integer message);
 
         public void disconnect() {
-            log.info("Shutting down connection");
+            log.info("**Shutting down connection");
             scheduledExecutorService.shutdown();
         }
-
     }
 
 }
