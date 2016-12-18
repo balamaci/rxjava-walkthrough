@@ -497,6 +497,7 @@ listening or not and we don't have control to request more.
 ### Subjects
 Subjects are one way to handle hot observables. Subjects keep reference to their subscribers and allow 'multicasting' 
 an event to them.
+
 ```java
 for (Disposable<T> s : subscribers.get()) {
     s.onNext(t);
@@ -523,17 +524,24 @@ Observable.create(subscriber -> {
       subscriber.onNext(val);
 })
 ```
+
+### ReplaySubject
+ReplaySubject keeps a buffer of events that it 'replays' to each new subscriber, first he receives a batch of missed 
+and only later events in real-time.
+```
+
+```
+
 ### ConnectableObservable
 There are cases when we want to . One such scenario might . 
 
 ### ConnectableObservable and resource sharing
 Another very useful usecase is that of resource sharing, for ex. when we want to share a connection
 between multiple Observables / Flowables. 
-Using a plain Observable would reexecute the code inside .create()
-and opening / closing a new connection for each Subscriber when it subscribes / cancels it's subscription.
+Using a plain Observable would reexecute the code inside .create() and opening / closing a new connection for each new subscriber when it subscribes / cancels it's subscription.
 This is where the **share()** operator is useful. It basically keeps a count of references of it's subscribers
 and executes the code inside create() just for the first subscriber but multicasts the same event to each active subscriber. 
-When the last subscriber unsubscribes in triggers any unsubscription callback associated with the ConnectableObservable.   
+When the last subscriber unsubscribes in triggers any unsubscription callback associated with the **ConnectableObservable**.   
 
 ```java
 ConnectableObservable<Integer> connectableStream = Observable.<Integer>create(subscriber -> {

@@ -61,20 +61,31 @@ public class Part04HotPublishers implements BaseTestObservables {
     public void replaySubject() {
         Subject<Integer> subject = ReplaySubject.createWithSize(50);
 
-        Runnable pushAction = pushEventsToSubjectAction(subject, 10);
-        periodicEventEmitter(pushAction, 500, TimeUnit.MILLISECONDS);
+//        Runnable pushAction = pushEventsToSubjectAction(subject, 10);
+//        periodicEventEmitter(pushAction, 500, TimeUnit.MILLISECONDS);
 
-        Helpers.sleepMillis(1000);
+        pushToSubject(subject, 0);
+        pushToSubject(subject, 1);
+
         CountDownLatch latch = new CountDownLatch(2);
         log.info("Subscribing 1st");
         subject.subscribe(val -> log.info("Subscriber1 received {}", val), logError(), logComplete(latch));
 
-        Helpers.sleepMillis(1000);
+        pushToSubject(subject, 2);
+
         log.info("Subscribing 2nd");
         subject.subscribe(val -> log.info("Subscriber2 received {}", val), logError(), logComplete(latch));
+        pushToSubject(subject, 3);
+
+        subject.onComplete();
+
         Helpers.wait(latch);
     }
 
+    private void pushToSubject(Subject<Integer> subject, int val) {
+        log.info("Pushing {}", val);
+        subject.onNext(val);
+    }
 
     @Test
     public void publishSubject() {
