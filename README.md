@@ -543,8 +543,46 @@ Observable.create(subscriber -> {
 ### ReplaySubject
 ReplaySubject keeps a buffer of events that it 'replays' to each new subscriber, first he receives a batch of missed 
 and only later events in real-time.
-```
 
+```java
+Subject<Integer> subject = ReplaySubject.createWithSize(50);
+
+log.info("Pushing 0");
+subject.onNext(0);
+log.info("Pushing 1");
+subject.onNext(1);
+
+log.info("Subscribing 1st");
+subject.subscribe(val -> log.info("Subscriber1 received {}", val), logError(), logComplete());
+
+log.info("Pushing 2");
+subject.onNext(2);
+
+log.info("Subscribing 2nd");
+subject.subscribe(val -> log.info("Subscriber2 received {}", val), logError(), logComplete());
+
+log.info("Pushing 3");
+subject.onNext(3);
+
+subject.onComplete();
+
+==================
+[main] INFO BaseTestObservables - Pushing 0
+[main] INFO BaseTestObservables - Pushing 1
+[main] INFO BaseTestObservables - Subscribing 1st
+[main] INFO BaseTestObservables - Subscriber1 received 0
+[main] INFO BaseTestObservables - Subscriber1 received 1
+[main] INFO BaseTestObservables - Pushing 2
+[main] INFO BaseTestObservables - Subscriber1 received 2
+[main] INFO BaseTestObservables - Subscribing 2nd
+[main] INFO BaseTestObservables - Subscriber2 received 0
+[main] INFO BaseTestObservables - Subscriber2 received 1
+[main] INFO BaseTestObservables - Subscriber2 received 2
+[main] INFO BaseTestObservables - Pushing 3
+[main] INFO BaseTestObservables - Subscriber1 received 3
+[main] INFO BaseTestObservables - Subscriber2 received 3
+[main] INFO BaseTestObservables - Subscriber got Completed event
+[main] INFO BaseTestObservables - Subscriber got Completed event
 ```
 
 ### ConnectableObservable
