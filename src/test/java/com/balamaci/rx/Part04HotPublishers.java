@@ -55,8 +55,6 @@ public class Part04HotPublishers implements BaseTestObservables {
      * PublishSubject - doesn't keep a buffer but instead, meaning if another subscriber subscribes later, it's going to loose events
      */
 
-    private int counter = 0;
-
     @Test
     public void replaySubject() {
         Subject<Integer> subject = ReplaySubject.createWithSize(50);
@@ -90,19 +88,6 @@ public class Part04HotPublishers implements BaseTestObservables {
     @Test
     public void publishSubject() {
         Subject<Integer> subject = PublishSubject.create();
-
-        Runnable action = () -> {
-            if(counter == 10) {
-                subject.onComplete();
-                return;
-            }
-
-            counter ++;
-
-            log.info("Emitted {}", counter);
-            subject.onNext(counter);
-        };
-        periodicEventEmitter(action, 500, TimeUnit.MILLISECONDS);
 
         Helpers.sleepMillis(1000);
         log.info("Subscribing 1st");
@@ -141,13 +126,93 @@ public class Part04HotPublishers implements BaseTestObservables {
         Helpers.wait(latch);
     }
 
+
     /**
      * ConnectableObservable
      */
     @Test
-    public void sharingResourcesBetweenObservablesWithConnectableObservable() {
-        Observable<Integer> connectableObservable = Observable.<Integer>create(subscriber -> {
+    public void sharingResourcesBetweenSubscriptions() {
+        ConnectableObservable<Integer> connectableObservable = Observable.<Integer>create(subscriber -> {
             log.info("Inside create()");
+
+            //A JMS connection listener example
+//            Connection connection = connectionFactory.createConnection();
+//            Session session = connection.createSession(true, AUTO_ACKNOWLEDGE);
+//            MessageConsumer consumer = session.createConsumer(orders);
+//            consumer.setMessageListener(subscriber::onNext);
+
+            subscriber.setCancellable(() -> log.info("Subscription cancelled"));
+
+            log.info("Emitting 1");
+            subscriber.onNext(1);
+
+            log.info("Emitting 2");
+            subscriber.onNext(2);
+
+            subscriber.onComplete();
+        }).publish();
+
+        log.info("Before subscribing");
+        CountDownLatch latch = new CountDownLatch(2);
+        connectableObservable
+                .take(1)
+                .subscribe((val) -> log.info("Subscriber1 received: {}", val), logError(), logComplete(latch));
+
+        connectableObservable
+                .subscribe((val) -> log.info("Subscriber2 received: {}", val), logError(), logComplete(latch));
+
+
+        log.info("Now connecting to the ConnectableObservable");
+        connectableObservable.connect();
+
+        Helpers.wait(latch);
+    }
+
+    @Test
+    public void autoConnectingWithFirstSubscriber() {
+        ConnectableObservable<Integer> connectableObservable = Observable.<Integer>create(subscriber -> {
+            log.info("Inside create()");
+
+            //simulating some listener that produces events after
+            //connection is initialized
+            ResourceConnectionHandler resourceConnectionHandler = new ResourceConnectionHandler() {
+                @Override
+                public void onMessage(Integer message) {
+                 log.info("Emitting {}", message);
+                 subscriber.onNext(message);
+                }
+            };
+
+            resourceConnectionHandler.connect();
+
+            subscriber.setCancellable(resourceConnectionHandler::disconnect);
+        }).publish();
+
+        Observable<Integer> observable = connectableObservable.autoConnect();
+
+        CountDownLatch latch = new CountDownLatch(2);
+        observable
+                .take(5)
+                .subscribe((val) -> log.info("Subscriber1 received: {}", val), logError(), logComplete(latch));
+        Helpers.sleepMillis(1000);
+
+        observable
+                .take(2)
+                .subscribe((val) -> log.info("Subscriber2 received: {}", val), logError(), logComplete(latch));
+
+        Helpers.wait(latch);
+    }
+
+    /**
+     *
+     */
+    @Test
+    public void refCountTheConnectableObservableAutomaticSubscriptionOperator() {
+        ConnectableObservable<Integer> connectableObservable = Observable.<Integer>create(subscriber -> {
+            log.info("Inside create()");
+
+            //simulating some listener that produces events after
+            //connection is initialized
             ResourceConnectionHandler resourceConnectionHandler = new ResourceConnectionHandler() {
                 @Override
                 public void onMessage(Integer message) {
@@ -155,52 +220,40 @@ public class Part04HotPublishers implements BaseTestObservables {
                     subscriber.onNext(message);
                 }
             };
+
             resourceConnectionHandler.connect();
 
             subscriber.setCancellable(resourceConnectionHandler::disconnect);
-        }).share();
-//        }).publish().refCount(); // publish().refCount() equals share()
+        }).publish();
+
+        Observable<Integer> observable = connectableObservable.refCount();
+        //publish().refCount() equals share()
 
         CountDownLatch latch = new CountDownLatch(2);
-        connectableObservable
+        observable
                 .take(5)
                 .subscribe((val) -> log.info("Subscriber1 received: {}", val), logError(), logComplete(latch));
 
         Helpers.sleepMillis(1000);
 
         log.info("Subscribing 2nd");
-        connectableObservable
+        //we're not seing the code inside .create() reexecuted
+        observable
                 .take(2)
                 .subscribe((val) -> log.info("Subscriber2 received: {}", val), logError(), logComplete(latch));
+
+        Helpers.wait(latch);
+
+        //subscribing another after previous Subscribers unsubscribed
+        latch = new CountDownLatch(1);
+        log.info("Subscribing 3rd");
+        observable
+                .take(1)
+                .subscribe((val) -> log.info("Subscriber3 received: {}", val), logError(), logComplete(latch));
         Helpers.wait(latch);
     }
 
-    @Test
-    public void connectable() {
-        ConnectableObservable<Integer> connectableObservable = Observable.<Integer>create(subscriber -> {
-            log.info("Inside create()");
-            ResourceConnectionHandler resourceConnectionHandler = new ResourceConnectionHandler() {
-                @Override
-                public void onMessage(Integer message) {
-                    log.info("Emitting {}", message);
-                    subscriber.onNext(message);
-                }
-            };
-            resourceConnectionHandler.connect();
 
-            subscriber.setCancellable(resourceConnectionHandler::disconnect);
-        }).publish();
-
-        log.info("Before subscribing");
-        CountDownLatch latch = new CountDownLatch(1);
-        connectableObservable
-                .take(4)
-                .subscribe((val) -> log.info("Subscriber1 received: {}", val), logError(), logComplete(latch));
-        log.info("After subscribing");
-
-        connectableObservable.connect();
-        Helpers.wait(latch);
-    }
 
 
     private ScheduledExecutorService periodicEventEmitter(Runnable action,
@@ -211,19 +264,6 @@ public class Part04HotPublishers implements BaseTestObservables {
         return scheduledExecutorService;
     }
 
-    private Runnable pushEventsToSubjectAction(Subject<Integer> subject, int maxEvents) {
-        return () -> {
-            if(counter == maxEvents) {
-                subject.onComplete();
-                return;
-            }
-
-            counter ++;
-
-            log.info("Emitted {}", counter);
-            subject.onNext(counter);
-        };
-    }
 
     private abstract class ResourceConnectionHandler {
 
@@ -248,4 +288,17 @@ public class Part04HotPublishers implements BaseTestObservables {
         }
     }
 
+    /*    private Runnable pushEventsToSubjectAction(Subject<Integer> subject, int maxEvents) {
+        return () -> {
+            if(counter == maxEvents) {
+                subject.onComplete();
+                return;
+            }
+
+            counter ++;
+
+            log.info("Emitted {}", counter);
+            subject.onNext(counter);
+        };
+    }*/
 }

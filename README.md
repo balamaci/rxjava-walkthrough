@@ -91,12 +91,12 @@ single.subscribe(val -> log.info("Stream completed successfully : {}", val));
 
 ### Creating your own stream
 
-Using **Flowable.create** to handle the actual emissions of events with the events like **onNext**, **onComplete**, **onError**
+We can use **Flowable.create(...)** to implement the emissions of events by calling **onNext(val)**, **onComplete()**, **onError(throwable)**
 
-When subscribing to the Observable / Flowable with flowable.subscribe(...) the lambda code inside create() gets executed.
+When subscribing to the Observable / Flowable with flowable.subscribe(...) the lambda code inside **create(...)** gets executed.
 Flowable.subscribe(...) can take 3 handlers for each type of event - onNext, onError and onCompleted.
 
-When using Observable.create you need to be aware of [backpressure](#backpressure) and that Observables created with 'create' are not BackPressure aware
+When using **Observable.create(...)** you need to be aware of [backpressure](#backpressure) and that Observables created with 'create' are not BackPressure aware
 
 ```java 
 Observable<Integer> stream = Observable.create(subscriber -> {
@@ -135,7 +135,7 @@ stream.subscribe(
 ### Streams are lazy 
 Streams are lazy meaning that the code inside create() doesn't get executed without subscribing to the stream.
 So event if we sleep for a long time inside create() method(to simulate a costly operation),
-without subscribing to this Observable the code is not executed and the method returns immediately.
+without subscribing to this Observable, the code is not executed and the method returns immediately.
 
 ```java
 public void observablesAreLazy() {
@@ -150,9 +150,10 @@ public void observablesAreLazy() {
 
 ### Multiple subscriptions to the same Observable / Flowable 
 When subscribing to an Observable/Flowable, the create() method gets executed for each subscription this means that the events 
-inside create are re-emitted to each subscriber. 
+inside create are re-emitted to each subscriber independently. 
 
 So every subscriber will get the same events and will not lose any events - this behavior is named **'cold observable'**
+See [Hot Publishers](hot-publisher) to understand how 
 
 ```java
 Observable<Integer> observable = Observable.create(subscriber -> {
@@ -197,8 +198,8 @@ will output
 ## Observable / Flowable lifecycle
 
 ### Operators
-Between the source Observable / Flowable and the Subscriber there can be a wide range of operators and there are lots
-of operators to chose from. Probably you are already familiar with functional operations like **filter** and **map**. 
+Between the source Observable / Flowable and the Subscriber there can be a wide range of operators and RxJava provides 
+lots of operators to chose from. Probably you are already familiar with functional operations like **filter** and **map**. 
 so let's use them as example:
 
 ```java
@@ -225,7 +226,7 @@ triggering it to start producing/emitting items**.
 **Flowable.create** calls **---&gt; filterOperator.onNext(val)** which if val &gt; 10 calls **---&gt; 
 mapOperator.onNext(val)** does val = val * 10 and calls **---&gt; subscriber.onNext(val)**. 
 
-[Found]() a nice analogy with a team of house movers, with every mover doing it's thing before passing it to the next in line 
+[Found](https://tomstechnicalblog.blogspot.ro/2015_10_01_archive.html) a nice analogy with a team of house movers, with every mover doing it's thing before passing it to the next in line 
 until it reaches the final subscriber.
 
 ![Movers](https://1.bp.blogspot.com/-1RuGVz4-U9Q/VjT0AsfiiUI/AAAAAAAAAKQ/xWQaOwNtS7o/s1600/animation_2.gif) 
@@ -277,6 +278,36 @@ observable
 ## Simple Operators
 Code is available at [Part02SimpleOperators.java](https://github.com/balamaci/rxjava-playground/blob/master/src/test/java/com/balamaci/rx/Part02SimpleOperators.java)
 
+### delay
+Delay operator - the Thread.sleep of the reactive world, it's pausing each emission for a particular increment of time.
+
+```java
+CountDownLatch latch = new CountDownLatch(1);
+Flowable.range(0, 2)
+        .doOnNext(val -> log.info("Emitted {}", val))
+        .delay(5, TimeUnit.SECONDS)
+        .subscribe(tick -> log.info("Tick {}", tick),
+                   (ex) -> log.info("Error emitted"),
+                   () -> {
+                          log.info("Completed");
+                          latch.countDown();
+                   });
+latch.await();
+
+==============
+14:27:44 [main] - Starting
+14:27:45 [main] - Emitted 0
+14:27:45 [main] - Emitted 1
+14:27:50 [RxComputationThreadPool-1] - Tick 0
+14:27:50 [RxComputationThreadPool-1] - Tick 1
+14:27:50 [RxComputationThreadPool-1] - Completed
+```
+
+The **.delay()**, **.interval()** operators uses a [Scheduler](#schedulers) by default which is why we see it executing
+on a different thread _RxComputationThreadPool-1_ which actually means it's running the operators and the subscribe operations 
+on another thread and so the test method will terminate before we see the text from the log unless we wait for the completion of the stream.
+
+
 ### interval
 Periodically emits a number starting from 0 and then increasing the value on each emission.
 
@@ -284,22 +315,20 @@ Periodically emits a number starting from 0 and then increasing the value on eac
 log.info("Starting");
 Flowable.interval(5, TimeUnit.SECONDS)
        .take(4)
-       .subscribe(tick -> log.info("Tick {}", tick),
+       .subscribe(tick -> log.info("Subscriber received {}", tick),
                   (ex) -> log.info("Error emitted"),
-                  () -> log.info("Completed"));
+                  () -> log.info("Subscriber got Completed event"));
 
 ==========
-22:27:44 [main] - Starting
-22:27:49 [main] - Tick 0
-22:27:54 [main] - Tick 1
-22:27:59 [main] - Tick 2
-22:28:04 [main] - Tick 3
-22:28:04 [main] - Completed
+12:17:56 [main] - Starting
+12:17:57 [RxComputationThreadPool-1] - Subscriber received: 0
+12:17:58 [RxComputationThreadPool-1] - Subscriber received: 1
+12:17:59 [RxComputationThreadPool-1] - Subscriber received: 2
+12:18:00 [RxComputationThreadPool-1] - Subscriber received: 3
+12:18:01 [RxComputationThreadPool-1] - Subscriber received: 4
+12:18:01 [RxComputationThreadPool-1] - Subscriber got Completed event
 ```
 
-The delay(), interval() operators uses a [Scheduler](#schedulers) by default, which actually means it's
-running the operators and the subscribe operations on a different thread and so the test method
-will terminate before we see the text from the log.
 
 
 ### scan
@@ -336,7 +365,8 @@ reduce operator acts like the scan operator but it only passes downstream the fi
 ```java
 Flowable<Integer> numbers = Flowable.just(3, 5, -2, 9)
                             .reduce(0, (totalSoFar, val) -> {
-                                         log.info("totalSoFar={}, emitted={}", totalSoFar, val);
+                                         log.info("totalSoFar={}, emitted={}",
+                                                        totalSoFar, val);
                                          return totalSoFar + val;
                             });
                             
@@ -543,21 +573,110 @@ Observable.create(subscriber -> {
 ### ReplaySubject
 ReplaySubject keeps a buffer of events that it 'replays' to each new subscriber, first he receives a batch of missed 
 and only later events in real-time.
+
+```java
+Subject<Integer> subject = ReplaySubject.createWithSize(50);
+
+log.info("Pushing 0");
+subject.onNext(0);
+log.info("Pushing 1");
+subject.onNext(1);
+
+log.info("Subscribing 1st");
+subject.subscribe(val -> log.info("Subscriber1 received {}", val), 
+                            logError(), logComplete());
+
+log.info("Pushing 2");
+subject.onNext(2);
+
+log.info("Subscribing 2nd");
+subject.subscribe(val -> log.info("Subscriber2 received {}", val), 
+                            logError(), logComplete());
+
+log.info("Pushing 3");
+subject.onNext(3);
+
+subject.onComplete();
+
+==================
+[main] - Pushing 0
+[main] - Pushing 1
+[main] - Subscribing 1st
+[main] - Subscriber1 received 0
+[main] - Subscriber1 received 1
+[main] - Pushing 2
+[main] - Subscriber1 received 2
+[main] - Subscribing 2nd
+[main] - Subscriber2 received 0
+[main] - Subscriber2 received 1
+[main] - Subscriber2 received 2
+[main] - Pushing 3
+[main] - Subscriber1 received 3
+[main] - Subscriber2 received 3
+[main] - Subscriber got Completed event
+[main] - Subscriber got Completed event
 ```
 
-```
+### ConnectableObservable / ConnectableFlowable and resource sharing
+There are cases when we want to share a single subscription between subscribers, meaning while the code that executes
+on subscribing should be executed once, the events should be published to all .     
 
-### ConnectableObservable
-There are cases when we want to . One such scenario might . 
-
-### ConnectableObservable and resource sharing
-Another very useful usecase is that of resource sharing, for ex. when we want to share a connection
-between multiple Observables / Flowables. 
-Using a plain Observable would reexecute the code inside _.create()_ and opening / closing a new connection for each 
+For ex. when we want to share a connection between multiple Observables / Flowables. 
+Using a plain Observable would just reexecute the code inside _.create()_ and opening / closing a new connection for each 
 new subscriber when it subscribes / cancels it's subscription.
-This is where the **share()** operator is useful. It basically keeps a count of references of it's subscribers
-and executes the code inside create() just for the first subscriber but multicasts the same event to each active subscriber. 
-When the last subscriber unsubscribes in triggers any unsubscription callback associated with the **ConnectableObservable**.   
+
+**ConnectableObservable** are a special kind of **Observable**. No matter how many Subscribers subscribe to ConnectableObservable, 
+it opens just one subscription to the Observable from which it was created.
+
+Anyone who subscribes to **ConnectableObservable** is placed in a set of Subscribers(it doesn't trigger
+the _.create()_ code a normal Observable would invoke). A **.connect()** method is available for ConnectableObservable.
+**As long as connect() is not called, these Subscribers are put on hold, they never directly subscribe to upstream Observable**
+
+```java
+ConnectableObservable<Integer> connectableObservable = 
+                                  Observable.<Integer>create(subscriber -> {
+        log.info("Inside create()");
+
+        // A JMS connection listener could have been used
+        //Connection connection = connectionFactory.createConnection();
+        //Session session = connection.createSession(true, AUTO_ACKNOWLEDGE);
+        //MessageConsumer consumer = session.createConsumer(orders);
+        //consumer.setMessageListener(subscriber::onNext);
+
+        subscriber.setCancellable(() -> log.info("Subscription cancelled"));
+
+        log.info("Emitting 1");
+        subscriber.onNext(1);
+
+        log.info("Emitting 2");
+        subscriber.onNext(2);
+
+        subscriber.onComplete();
+}).publish();
+
+connectableObservable
+       .take(1)
+       .subscribe((val) -> log.info("Subscriber1 received: {}", val), 
+                    logError(), logComplete());
+
+connectableObservable
+       .subscribe((val) -> log.info("Subscriber2 received: {}", val), 
+                    logError(), logComplete());
+
+log.info("Now connecting to the ConnectableObservable");
+connectableObservable.connect();
+
+===================
+
+```
+
+### share() operator 
+Another operator of the ConnectableObservable **.refCount()** allows to do away with having to manually call **.connect()**,
+instead it invokes the .create() code when the first Subscriber subscribes while sharing this single subscription with subsequent Subscribers.
+This means that **.refCount()** basically keeps a count of references of it's subscribers and subscribes to upstream Observable
+(executes the code inside .create() just for the first subscriber), but multicasts the same event to each active subscriber. 
+When the last subscriber unsubscribes, the ref counter goes from 1 to 0 and triggers any unsubscribe callback associated.   
+If another Subscriber subscribes after that, counter goes from 0 to 1 and the process starts over again. 
 
 ```java
 ConnectableObservable<Integer> connectableStream = Observable.<Integer>create(subscriber -> {
@@ -575,19 +694,35 @@ ConnectableObservable<Integer> connectableStream = Observable.<Integer>create(su
 
    //when the last subscriber unsubscribes it will invoke disconnect on the resourceConnectionHandler
    subscriber.setCancellable(resourceConnectionHandler::disconnect);
-}).share(); 
+}).publish(); 
 
+Observable<Integer> observable = connectableObservable.refCount();
+//publish().refCount() equals share()
+
+CountDownLatch latch = new CountDownLatch(2);
 connectableStream
       .take(5)
-      .subscribe((val) -> log.info("Subscriber1 received: {}", val), logError(), logComplete());
+      .subscribe((val) -> log.info("Subscriber1 received: {}", val), 
+                    logError(), logComplete(latch));
 
 Helpers.sleepMillis(1000);
 
 log.info("Subscribing 2nd");
-//we're not seing 
+//we're not seing the code inside .create() reexecuted
 connectableStream
       .take(2)
-      .subscribe((val) -> log.info("Subscriber2 received: {}", val), logError(), logComplete());
+      .subscribe((val) -> log.info("Subscriber2 received: {}", val), 
+                    logError(), logComplete(latch));
+
+//waiting for the stream to complete
+Helpers.wait(latch);
+
+//subscribing another after previous Subscribers unsubscribed
+latch = new CountDownLatch(1);
+log.info("Subscribing 3rd");
+observable
+     .take(1)
+     .subscribe((val) -> log.info("Subscriber3 received: {}", val), logError(), logComplete(latch));
 
 
 private abstract class ResourceConnectionHandler {
@@ -614,26 +749,33 @@ private abstract class ResourceConnectionHandler {
 }
 
 ===============
-23:07:08 [main] - Inside create()
-23:07:08 [main] - **Opening connection
-23:07:08 [pool-1-thread-1] - Emitting 1
-23:07:08 [pool-1-thread-1] - Subscriber1 received: 1
-23:07:08 [pool-1-thread-1] - Emitting 2
-23:07:08 [pool-1-thread-1] - Subscriber1 received: 2
-23:07:09 [pool-1-thread-1] - Emitting 3
-23:07:09 [pool-1-thread-1] - Subscriber1 received: 3
-23:07:09 [main] - Subscribing 2nd
-23:07:09 [pool-1-thread-1] - Emitting 4
-23:07:09 [pool-1-thread-1] - Subscriber1 received: 4
-23:07:09 [pool-1-thread-1] - Subscriber2 received: 4
-23:07:10 [pool-1-thread-1] - Emitting 5
-23:07:10 [pool-1-thread-1] - Subscriber1 received: 5
-23:07:10 [pool-1-thread-1] - Subscriber got Completed event
-23:07:10 [pool-1-thread-1] - Subscriber2 received: 5
-23:07:10 [pool-1-thread-1] - **Shutting down connection
-23:07:10 [pool-1-thread-1] - Subscriber got Completed event
+14:55:23 [main] INFO BaseTestObservables - Inside create()
+14:55:23 [main] INFO BaseTestObservables - **Opening connection
+14:55:23 [pool-1-thread-1] INFO BaseTestObservables - Emitting 1
+14:55:23 [pool-1-thread-1] INFO BaseTestObservables - Subscriber1 received: 1
+14:55:24 [pool-1-thread-1] INFO BaseTestObservables - Emitting 2
+14:55:24 [pool-1-thread-1] INFO BaseTestObservables - Subscriber1 received: 2
+14:55:24 [pool-1-thread-1] INFO BaseTestObservables - Emitting 3
+14:55:24 [pool-1-thread-1] INFO BaseTestObservables - Subscriber1 received: 3
+14:55:24 [main] INFO BaseTestObservables - Subscribing 2nd
+14:55:25 [pool-1-thread-1] INFO BaseTestObservables - Emitting 4
+14:55:25 [pool-1-thread-1] INFO BaseTestObservables - Subscriber1 received: 4
+14:55:25 [pool-1-thread-1] INFO BaseTestObservables - Subscriber2 received: 4
+14:55:25 [pool-1-thread-1] INFO BaseTestObservables - Emitting 5
+14:55:25 [pool-1-thread-1] INFO BaseTestObservables - Subscriber1 received: 5
+14:55:25 [pool-1-thread-1] INFO BaseTestObservables - Subscriber got Completed event
+14:55:25 [pool-1-thread-1] INFO BaseTestObservables - Subscriber2 received: 5
+14:55:25 [pool-1-thread-1] INFO BaseTestObservables - **Shutting down connection
+14:55:25 [pool-1-thread-1] INFO BaseTestObservables - Subscriber got Completed event
+14:55:25 [main] INFO BaseTestObservables - Subscribing 3rd
+14:55:25 [main] INFO BaseTestObservables - Inside create()
+14:55:25 [main] INFO BaseTestObservables - **Opening connection
+14:55:25 [pool-2-thread-1] INFO BaseTestObservables - Emitting 1
+14:55:25 [pool-2-thread-1] INFO BaseTestObservables - Subscriber3 received: 1
+14:55:25 [pool-2-thread-1] INFO BaseTestObservables - **Shutting down connection
+14:55:25 [pool-2-thread-1] INFO BaseTestObservables - Subscriber got Completed event
 ```
-
+The **share()** operator of Observable / Flowable is an operator which basically does **publish().refCount()**. 
 
 ## Schedulers
 RxJava provides some high level concepts for concurrent execution, like ExecutorService we're not dealing
@@ -676,20 +818,20 @@ and these results are emitted back as elements to the subscribers downstream
    to make a remote call that returns an Observable. For ex if you have a stream of customerIds, and downstream you
     want to work with actual Customer objects:
     
-    ```java   
-    Observable<Customer> getCustomer(Integer customerId) {..}
-        ...
+```java   
+Observable<Customer> getCustomer(Integer customerId) {..}
+...
    
-    Observable<Integer> customerIds = Observable.of(1,2,3,4);
-    Observable<Customer> customers = customerIds
-                                        .flatMap(customerId -> getCustomer(customerId));
-    ```
+Observable<Integer> customerIds = Observable.of(1,2,3,4);
+Observable<Customer> customers = customerIds
+                                 .flatMap(customerId -> getCustomer(customerId));
+```
    
    - When you have Observable&lt;Observable&lt;T&gt;&gt; you probably need flatMap.
 
     We use a simulated remote call that might return asynchronous as many events as the length of the color string
 
-    ```java
+```java
     private Observable<String> simulateRemoteOperation(String color) {
         return Observable.<String>create(subscriber -> {
                     Runnable asyncRun = () -> {
@@ -703,7 +845,7 @@ and these results are emitted back as elements to the subscribers downstream
                     new Thread(asyncRun).start();
                 });
     }
-    ```
+```
 
 If we have a stream of color names:
 
@@ -768,7 +910,7 @@ Notice now there is a sequence from each color before the next one appears
 17:15:27 [Thread-2]- Subscriber received: green4
 ```
 
-There is actually an operator which is basically this flatMap with 1 concurrency called **concatMap**.
+There is actually an operator which is basically this **flatMap with 1 concurrency called concatMap**.
 
 
 Inside the flatMap we can operate on the substream with the same stream operators
@@ -1097,6 +1239,7 @@ until now we did not see a custom **onSubscribe** request being implemented. Thi
 there is a default implementation which requests of Long.MAX_VALUE which basically means "send all you have".
 
 Neither did we see the code in the producer that takes consideration of the number of items requested by the subscriber. 
+
 ```java
 Flowable.create(subscriber -> {
       log.info("Started emitting");
