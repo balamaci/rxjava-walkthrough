@@ -188,6 +188,8 @@ public class Part01CreateFlowable implements BaseTestObservables {
                 subscriber.onNext(i++);
             }
             //subscriber.onCompleted(); too late to emit Complete event since subscriber already unsubscribed
+
+            subscriber.setCancellable(() -> log.info("Subscription canceled"));
         });
 
         observable

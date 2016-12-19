@@ -199,6 +199,7 @@ will output
 ### Operators
 Between the source Observable / Flowable and the Subscriber there can be a wide range of operators and there are lots
 of operators to chose from. Probably you are already familiar with functional operations like **filter** and **map**. 
+so let's use them as example:
 
 ```java
 Flowable<Integer> stream = Flowable.create(subscriber -> {
@@ -212,18 +213,19 @@ Flowable<Integer> stream = Flowable.create(subscriber -> {
     .subscribe(val -> log.info("Received: {}", val));
 ```
 
-When we call _Flowable.create()_ you might think that we're calling onNext(..), onComplete(..) the Subscriber at the end of the chain, 
+When we call _Flowable.create()_ you might think that we're calling onNext(..), onComplete(..) on the Subscriber at the end of the chain, 
 not the operators between them.
 
 This is not true because **the operators themselves are decorators for their source** wrapping it with the operator behavior 
 like an onion's layers. 
-
-**Subscription propagates through the layers back to the source and triggers it to start producing/emitting items**.
+When we call **.subscribe()** at the end of the chain, **Subscription propagates through the layers back to the source,
+each operator subscribing itself to it's wrapped source Observable / Flowable and so on to the original source, 
+triggering it to start producing/emitting items**.
 
 **Flowable.create** calls **---&gt; filterOperator.onNext(val)** which if val &gt; 10 calls **---&gt; 
 mapOperator.onNext(val)** does val = val * 10 and calls **---&gt; subscriber.onNext(val)**. 
 
-[Found] a nice analogy with a team of house movers, with every mover doing it's thing before passing it to the next in line 
+[Found]() a nice analogy with a team of house movers, with every mover doing it's thing before passing it to the next in line 
 until it reaches the final subscriber.
 
 ![Movers](https://1.bp.blogspot.com/-1RuGVz4-U9Q/VjT0AsfiiUI/AAAAAAAAAKQ/xWQaOwNtS7o/s1600/animation_2.gif) 
@@ -248,6 +250,9 @@ Observable<Integer> observable = Observable.create(subscriber -> {
         }
 
         subscriber.onNext(i++);
+        
+        //registering a callback when the downstream subscriber unsubscribes
+        subscriber.setCancellable(() -> log.info("Subscription canceled"));
     }
 });
 
@@ -258,6 +263,14 @@ observable
                () -> log.info("Subscriber got Completed event") //The Complete event 
                //is triggered by 'take()' operator
 
+==================
+[main] - Subscriber received: *1*
+[main] - Subscriber received: *2*
+[main] - Subscriber received: *3*
+[main] - Subscriber received: *4*
+[main] - Subscriber received: *5*
+[main] - Subscriber got Completed event
+[main] - Subscription canceled
 ```
 
 
@@ -490,9 +503,10 @@ and the seconds stream is subscribed.
 ## Hot Publishers
 We've seen that with 'cold publishers', whenever a subscriber subscribes, each subscriber will get
 it's version of emitted values independently, the exact set of data indifferently when they subscribe.
-But cold publishers only pump data when the subscribers subscribes, however there are cases where 
+But cold publishers only produce data when the subscribers subscribes, however there are cases where 
 the events happen independently from the consumers regardless if someone is 
-listening or not and we don't have control to request more.  
+listening or not and we don't have control to request more. So you could say we have 'cold publishers' for pull
+scenarios and 'hot publishers' which push.
 
 ### Subjects
 Subjects are one way to handle hot observables. Subjects keep reference to their subscribers and allow 'multicasting' 
@@ -505,7 +519,8 @@ for (Disposable<T> s : subscribers.get()) {
 ```
 
 Subjects besides being traditional Observables you can use the same operators and subscribe to them,
-are also an **Observer**(interface like Subscriber, implementing the 3 methods **onNext, onError, onComplete**), meaning you can invoke subject.onNext(value) from different parts in the code,
+are also an **Observer**(interface like **Subscriber** from [reactive-streams](#reactive-streams), implementing the 3 methods **onNext, onError, onComplete**), 
+meaning you can invoke subject.onNext(value) from different parts in the code,
 which means that you publish events which the Subject will pass on to their subscribers.
 
 ```java
@@ -538,7 +553,8 @@ There are cases when we want to . One such scenario might .
 ### ConnectableObservable and resource sharing
 Another very useful usecase is that of resource sharing, for ex. when we want to share a connection
 between multiple Observables / Flowables. 
-Using a plain Observable would reexecute the code inside .create() and opening / closing a new connection for each new subscriber when it subscribes / cancels it's subscription.
+Using a plain Observable would reexecute the code inside _.create()_ and opening / closing a new connection for each 
+new subscriber when it subscribes / cancels it's subscription.
 This is where the **share()** operator is useful. It basically keeps a count of references of it's subscribers
 and executes the code inside create() just for the first subscriber but multicasts the same event to each active subscriber. 
 When the last subscriber unsubscribes in triggers any unsubscription callback associated with the **ConnectableObservable**.   
