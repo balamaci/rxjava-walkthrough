@@ -569,25 +569,25 @@ subject.onNext(3);
 subject.onComplete();
 
 ==================
-[main] INFO BaseTestObservables - Pushing 0
-[main] INFO BaseTestObservables - Pushing 1
-[main] INFO BaseTestObservables - Subscribing 1st
-[main] INFO BaseTestObservables - Subscriber1 received 0
-[main] INFO BaseTestObservables - Subscriber1 received 1
-[main] INFO BaseTestObservables - Pushing 2
-[main] INFO BaseTestObservables - Subscriber1 received 2
-[main] INFO BaseTestObservables - Subscribing 2nd
-[main] INFO BaseTestObservables - Subscriber2 received 0
-[main] INFO BaseTestObservables - Subscriber2 received 1
-[main] INFO BaseTestObservables - Subscriber2 received 2
-[main] INFO BaseTestObservables - Pushing 3
-[main] INFO BaseTestObservables - Subscriber1 received 3
-[main] INFO BaseTestObservables - Subscriber2 received 3
-[main] INFO BaseTestObservables - Subscriber got Completed event
-[main] INFO BaseTestObservables - Subscriber got Completed event
+[main] - Pushing 0
+[main] - Pushing 1
+[main] - Subscribing 1st
+[main] - Subscriber1 received 0
+[main] - Subscriber1 received 1
+[main] - Pushing 2
+[main] - Subscriber1 received 2
+[main] - Subscribing 2nd
+[main] - Subscriber2 received 0
+[main] - Subscriber2 received 1
+[main] - Subscriber2 received 2
+[main] - Pushing 3
+[main] - Subscriber1 received 3
+[main] - Subscriber2 received 3
+[main] - Subscriber got Completed event
+[main] - Subscriber got Completed event
 ```
 
-### ConnectableObservable and resource sharing
+### ConnectableObservable / ConnectableFlowable and resource sharing
 There are cases when we want to share a single subscription between subscribers, meaning while the code that executes
 on subscribing should be executed once, the events should be published to all .     
 
@@ -598,34 +598,54 @@ new subscriber when it subscribes / cancels it's subscription.
 **ConnectableObservable** are a special kind of **Observable**. No matter how many Subscribers subscribe to ConnectableObservable, 
 it opens just one subscription to the Observable from which it was created.
 
-Anyone who subscribes to ConnectableObservable is placed in a set of Subscribers. As long as connect() is not called, 
-these Subscribers are put on hold, they never directly subscribe to upstream Observable
+Anyone who subscribes to **ConnectableObservable** is placed in a set of Subscribers(it doesn't trigger
+the _.create()_ code a normal Observable would invoke). A **.connect()** method is available for ConnectableObservable.
+**As long as connect() is not called, these Subscribers are put on hold, they never directly subscribe to upstream Observable**
+
 ```java
-ConnectableObservable<Integer> connectableObservable = Observable.<Integer>create(subscriber -> {
+ConnectableObservable<Integer> connectableObservable = 
+                                  Observable.<Integer>create(subscriber -> {
         log.info("Inside create()");
 
-        // A JMS connection listener example
+        // A JMS connection listener could have been used
         //Connection connection = connectionFactory.createConnection();
         //Session session = connection.createSession(true, AUTO_ACKNOWLEDGE);
         //MessageConsumer consumer = session.createConsumer(orders);
         //consumer.setMessageListener(subscriber::onNext);
 
-            subscriber.setCancellable(() -> log.info("Subscription cancelled"));
+        subscriber.setCancellable(() -> log.info("Subscription cancelled"));
 
-            log.info("Emitting 1");
-            subscriber.onNext(1);
+        log.info("Emitting 1");
+        subscriber.onNext(1);
 
-            log.info("Emitting 2");
-            subscriber.onNext(2);
+        log.info("Emitting 2");
+        subscriber.onNext(2);
 
-            subscriber.onComplete();
-        }).publish();
+        subscriber.onComplete();
+}).publish();
+
+connectableObservable
+       .take(1)
+       .subscribe((val) -> log.info("Subscriber1 received: {}", val), 
+                    logError(), logComplete());
+
+connectableObservable
+       .subscribe((val) -> log.info("Subscriber2 received: {}", val), 
+                    logError(), logComplete());
+
+log.info("Now connecting to the ConnectableObservable");
+connectableObservable.connect();
+
+===================
 
 ```
 
-This is where the **share()** operator is useful. It basically keeps a count of references of it's subscribers
-and executes the code inside create() just for the first subscriber but multicasts the same event to each active subscriber. 
-When the last subscriber unsubscribes in triggers any unsubscription callback associated.   
+Another operator of the ConnectableObservable **.refCount()** allows to do away with having to manually call .connect(),
+instead it invokes the .create() code when the first Subscriber subscribes a d .
+So **.refCount()** basically keeps a count of references of it's subscribers and subscribes to upstream Observable
+(executes the code inside .create() just for the first subscriber), but multicasts the same event to each active subscriber. 
+When the last subscriber unsubscribes, the ref counter goes from 1 to 0 and triggers any unsubscription callback associated.   
+If another Subscriber subscribes after that, counter goes from 0 to 1 and the process starts over again. 
 
 ```java
 ConnectableObservable<Integer> connectableStream = Observable.<Integer>create(subscriber -> {
@@ -647,15 +667,17 @@ ConnectableObservable<Integer> connectableStream = Observable.<Integer>create(su
 
 connectableStream
       .take(5)
-      .subscribe((val) -> log.info("Subscriber1 received: {}", val), logError(), logComplete());
+      .subscribe((val) -> log.info("Subscriber1 received: {}", val), 
+                    logError(), logComplete());
 
 Helpers.sleepMillis(1000);
 
 log.info("Subscribing 2nd");
-//we're not seing 
+//we're not seing the code inside .create() reexecuted
 connectableStream
       .take(2)
-      .subscribe((val) -> log.info("Subscriber2 received: {}", val), logError(), logComplete());
+      .subscribe((val) -> log.info("Subscriber2 received: {}", val), 
+                    logError(), logComplete());
 
 
 private abstract class ResourceConnectionHandler {
@@ -701,7 +723,7 @@ private abstract class ResourceConnectionHandler {
 23:07:10 [pool-1-thread-1] - **Shutting down connection
 23:07:10 [pool-1-thread-1] - Subscriber got Completed event
 ```
-
+The **share()** operator of Observable / Flowable is an operator which basically does **publish().refCount()**. 
 
 ## Schedulers
 RxJava provides some high level concepts for concurrent execution, like ExecutorService we're not dealing
@@ -836,7 +858,7 @@ Notice now there is a sequence from each color before the next one appears
 17:15:27 [Thread-2]- Subscriber received: green4
 ```
 
-There is actually an operator which is basically this flatMap with 1 concurrency called **concatMap**.
+There is actually an operator which is basically this **flatMap with 1 concurrency called concatMap**.
 
 
 Inside the flatMap we can operate on the substream with the same stream operators

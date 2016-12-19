@@ -154,9 +154,6 @@ public class Part04HotPublishers implements BaseTestObservables {
             subscriber.onComplete();
         }).publish();
 
-        connectableObservable.refCount();
-
-
         log.info("Before subscribing");
         CountDownLatch latch = new CountDownLatch(2);
         connectableObservable
@@ -169,6 +166,7 @@ public class Part04HotPublishers implements BaseTestObservables {
 
         log.info("Now connecting to the ConnectableObservable");
         connectableObservable.connect();
+
         Helpers.wait(latch);
     }
 
@@ -176,6 +174,7 @@ public class Part04HotPublishers implements BaseTestObservables {
     public void connectableObservableAutomaticSubscription() {
         ConnectableObservable<Integer> connectableObservable = Observable.<Integer>create(subscriber -> {
             log.info("Inside create()");
+
             ResourceConnectionHandler resourceConnectionHandler = new ResourceConnectionHandler() {
                 @Override
                 public void onMessage(Integer message) {
@@ -183,12 +182,14 @@ public class Part04HotPublishers implements BaseTestObservables {
                     subscriber.onNext(message);
                 }
             };
+
             resourceConnectionHandler.connect();
 
             subscriber.setCancellable(resourceConnectionHandler::disconnect);
-        }).publish(); // publish().refCount() equals share()
+        }).publish();
 
         Observable<Integer> observable = connectableObservable.refCount();
+        //publish().refCount() equals share()
 
         CountDownLatch latch = new CountDownLatch(2);
         observable
@@ -204,7 +205,6 @@ public class Part04HotPublishers implements BaseTestObservables {
         Helpers.wait(latch);
 
         log.info("Subscribing 2nd");
-
     }
 
 
