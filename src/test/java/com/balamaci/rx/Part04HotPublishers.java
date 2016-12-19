@@ -91,19 +91,6 @@ public class Part04HotPublishers implements BaseTestObservables {
     public void publishSubject() {
         Subject<Integer> subject = PublishSubject.create();
 
-        Runnable action = () -> {
-            if(counter == 10) {
-                subject.onComplete();
-                return;
-            }
-
-            counter ++;
-
-            log.info("Emitted {}", counter);
-            subject.onNext(counter);
-        };
-        periodicEventEmitter(action, 500, TimeUnit.MILLISECONDS);
-
         Helpers.sleepMillis(1000);
         log.info("Subscribing 1st");
 
@@ -141,42 +128,52 @@ public class Part04HotPublishers implements BaseTestObservables {
         Helpers.wait(latch);
     }
 
+
     /**
      * ConnectableObservable
      */
     @Test
-    public void sharingResourcesBetweenObservablesWithConnectableObservable() {
-        Observable<Integer> connectableObservable = Observable.<Integer>create(subscriber -> {
+    public void sharingResourcesBetweenSubscriptions() {
+        ConnectableObservable<Integer> connectableObservable = Observable.<Integer>create(subscriber -> {
             log.info("Inside create()");
-            ResourceConnectionHandler resourceConnectionHandler = new ResourceConnectionHandler() {
-                @Override
-                public void onMessage(Integer message) {
-                    log.info("Emitting {}", message);
-                    subscriber.onNext(message);
-                }
-            };
-            resourceConnectionHandler.connect();
 
-            subscriber.setCancellable(resourceConnectionHandler::disconnect);
-        }).share();
-//        }).publish().refCount(); // publish().refCount() equals share()
+            //A JMS connection listener example
+//            Connection connection = connectionFactory.createConnection();
+//            Session session = connection.createSession(true, AUTO_ACKNOWLEDGE);
+//            MessageConsumer consumer = session.createConsumer(orders);
+//            consumer.setMessageListener(subscriber::onNext);
 
+            subscriber.setCancellable(() -> log.info("Subscription cancelled"));
+
+            log.info("Emitting 1");
+            subscriber.onNext(1);
+
+            log.info("Emitting 2");
+            subscriber.onNext(2);
+
+            subscriber.onComplete();
+        }).publish();
+
+        connectableObservable.refCount();
+
+
+        log.info("Before subscribing");
         CountDownLatch latch = new CountDownLatch(2);
         connectableObservable
-                .take(5)
+                .take(1)
                 .subscribe((val) -> log.info("Subscriber1 received: {}", val), logError(), logComplete(latch));
 
-        Helpers.sleepMillis(1000);
-
-        log.info("Subscribing 2nd");
         connectableObservable
-                .take(2)
                 .subscribe((val) -> log.info("Subscriber2 received: {}", val), logError(), logComplete(latch));
+
+
+        log.info("Now connecting to the ConnectableObservable");
+        connectableObservable.connect();
         Helpers.wait(latch);
     }
 
     @Test
-    public void connectable() {
+    public void connectableObservableAutomaticSubscription() {
         ConnectableObservable<Integer> connectableObservable = Observable.<Integer>create(subscriber -> {
             log.info("Inside create()");
             ResourceConnectionHandler resourceConnectionHandler = new ResourceConnectionHandler() {
@@ -189,18 +186,28 @@ public class Part04HotPublishers implements BaseTestObservables {
             resourceConnectionHandler.connect();
 
             subscriber.setCancellable(resourceConnectionHandler::disconnect);
-        }).publish();
+        }).publish(); // publish().refCount() equals share()
 
-        log.info("Before subscribing");
-        CountDownLatch latch = new CountDownLatch(1);
-        connectableObservable
-                .take(4)
+        Observable<Integer> observable = connectableObservable.refCount();
+
+        CountDownLatch latch = new CountDownLatch(2);
+        observable
+                .take(5)
                 .subscribe((val) -> log.info("Subscriber1 received: {}", val), logError(), logComplete(latch));
-        log.info("After subscribing");
 
-        connectableObservable.connect();
+        Helpers.sleepMillis(1000);
+
+        log.info("Subscribing 2nd");
+        observable
+                .take(2)
+                .subscribe((val) -> log.info("Subscriber2 received: {}", val), logError(), logComplete(latch));
         Helpers.wait(latch);
+
+        log.info("Subscribing 2nd");
+
     }
+
+
 
 
     private ScheduledExecutorService periodicEventEmitter(Runnable action,
@@ -211,19 +218,6 @@ public class Part04HotPublishers implements BaseTestObservables {
         return scheduledExecutorService;
     }
 
-    private Runnable pushEventsToSubjectAction(Subject<Integer> subject, int maxEvents) {
-        return () -> {
-            if(counter == maxEvents) {
-                subject.onComplete();
-                return;
-            }
-
-            counter ++;
-
-            log.info("Emitted {}", counter);
-            subject.onNext(counter);
-        };
-    }
 
     private abstract class ResourceConnectionHandler {
 
@@ -248,4 +242,17 @@ public class Part04HotPublishers implements BaseTestObservables {
         }
     }
 
+    /*    private Runnable pushEventsToSubjectAction(Subject<Integer> subject, int maxEvents) {
+        return () -> {
+            if(counter == maxEvents) {
+                subject.onComplete();
+                return;
+            }
+
+            counter ++;
+
+            log.info("Emitted {}", counter);
+            subject.onNext(counter);
+        };
+    }*/
 }

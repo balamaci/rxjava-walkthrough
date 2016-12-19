@@ -553,13 +553,15 @@ log.info("Pushing 1");
 subject.onNext(1);
 
 log.info("Subscribing 1st");
-subject.subscribe(val -> log.info("Subscriber1 received {}", val), logError(), logComplete());
+subject.subscribe(val -> log.info("Subscriber1 received {}", val), 
+                            logError(), logComplete());
 
 log.info("Pushing 2");
 subject.onNext(2);
 
 log.info("Subscribing 2nd");
-subject.subscribe(val -> log.info("Subscriber2 received {}", val), logError(), logComplete());
+subject.subscribe(val -> log.info("Subscriber2 received {}", val), 
+                            logError(), logComplete());
 
 log.info("Pushing 3");
 subject.onNext(3);
@@ -585,17 +587,45 @@ subject.onComplete();
 [main] INFO BaseTestObservables - Subscriber got Completed event
 ```
 
-### ConnectableObservable
-There are cases when we want to . One such scenario might . 
-
 ### ConnectableObservable and resource sharing
-Another very useful usecase is that of resource sharing, for ex. when we want to share a connection
-between multiple Observables / Flowables. 
-Using a plain Observable would reexecute the code inside _.create()_ and opening / closing a new connection for each 
+There are cases when we want to share a single subscription between subscribers, meaning while the code that executes
+on subscribing should be executed once, the events should be published to all .     
+
+For ex. when we want to share a connection between multiple Observables / Flowables. 
+Using a plain Observable would just reexecute the code inside _.create()_ and opening / closing a new connection for each 
 new subscriber when it subscribes / cancels it's subscription.
+
+**ConnectableObservable** are a special kind of **Observable**. No matter how many Subscribers subscribe to ConnectableObservable, 
+it opens just one subscription to the Observable from which it was created.
+
+Anyone who subscribes to ConnectableObservable is placed in a set of Subscribers. As long as connect() is not called, 
+these Subscribers are put on hold, they never directly subscribe to upstream Observable
+```java
+ConnectableObservable<Integer> connectableObservable = Observable.<Integer>create(subscriber -> {
+        log.info("Inside create()");
+
+        // A JMS connection listener example
+        //Connection connection = connectionFactory.createConnection();
+        //Session session = connection.createSession(true, AUTO_ACKNOWLEDGE);
+        //MessageConsumer consumer = session.createConsumer(orders);
+        //consumer.setMessageListener(subscriber::onNext);
+
+            subscriber.setCancellable(() -> log.info("Subscription cancelled"));
+
+            log.info("Emitting 1");
+            subscriber.onNext(1);
+
+            log.info("Emitting 2");
+            subscriber.onNext(2);
+
+            subscriber.onComplete();
+        }).publish();
+
+```
+
 This is where the **share()** operator is useful. It basically keeps a count of references of it's subscribers
 and executes the code inside create() just for the first subscriber but multicasts the same event to each active subscriber. 
-When the last subscriber unsubscribes in triggers any unsubscription callback associated with the **ConnectableObservable**.   
+When the last subscriber unsubscribes in triggers any unsubscription callback associated.   
 
 ```java
 ConnectableObservable<Integer> connectableStream = Observable.<Integer>create(subscriber -> {
@@ -714,20 +744,20 @@ and these results are emitted back as elements to the subscribers downstream
    to make a remote call that returns an Observable. For ex if you have a stream of customerIds, and downstream you
     want to work with actual Customer objects:
     
-    ```java   
-    Observable<Customer> getCustomer(Integer customerId) {..}
-        ...
+```java   
+Observable<Customer> getCustomer(Integer customerId) {..}
+...
    
-    Observable<Integer> customerIds = Observable.of(1,2,3,4);
-    Observable<Customer> customers = customerIds
-                                        .flatMap(customerId -> getCustomer(customerId));
-    ```
+Observable<Integer> customerIds = Observable.of(1,2,3,4);
+Observable<Customer> customers = customerIds
+                                 .flatMap(customerId -> getCustomer(customerId));
+```
    
    - When you have Observable&lt;Observable&lt;T&gt;&gt; you probably need flatMap.
 
     We use a simulated remote call that might return asynchronous as many events as the length of the color string
 
-    ```java
+```java
     private Observable<String> simulateRemoteOperation(String color) {
         return Observable.<String>create(subscriber -> {
                     Runnable asyncRun = () -> {
@@ -741,7 +771,7 @@ and these results are emitted back as elements to the subscribers downstream
                     new Thread(asyncRun).start();
                 });
     }
-    ```
+```
 
 If we have a stream of color names:
 
