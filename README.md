@@ -91,12 +91,12 @@ single.subscribe(val -> log.info("Stream completed successfully : {}", val));
 
 ### Creating your own stream
 
-Using **Flowable.create** to handle the actual emissions of events with the events like **onNext**, **onComplete**, **onError**
+We can use **Flowable.create(...)** to implement the emissions of events by calling **onNext(val)**, **onComplete()**, **onError(throwable)**
 
-When subscribing to the Observable / Flowable with flowable.subscribe(...) the lambda code inside create() gets executed.
+When subscribing to the Observable / Flowable with flowable.subscribe(...) the lambda code inside **create(...)** gets executed.
 Flowable.subscribe(...) can take 3 handlers for each type of event - onNext, onError and onCompleted.
 
-When using Observable.create you need to be aware of [backpressure](#backpressure) and that Observables created with 'create' are not BackPressure aware
+When using **Observable.create(...)** you need to be aware of [backpressure](#backpressure) and that Observables created with 'create' are not BackPressure aware
 
 ```java 
 Observable<Integer> stream = Observable.create(subscriber -> {
@@ -135,7 +135,7 @@ stream.subscribe(
 ### Streams are lazy 
 Streams are lazy meaning that the code inside create() doesn't get executed without subscribing to the stream.
 So event if we sleep for a long time inside create() method(to simulate a costly operation),
-without subscribing to this Observable the code is not executed and the method returns immediately.
+without subscribing to this Observable, the code is not executed and the method returns immediately.
 
 ```java
 public void observablesAreLazy() {
@@ -150,10 +150,10 @@ public void observablesAreLazy() {
 
 ### Multiple subscriptions to the same Observable / Flowable 
 When subscribing to an Observable/Flowable, the create() method gets executed for each subscription this means that the events 
-inside create are re-emitted to each subscriber. 
+inside create are re-emitted to each subscriber independently. 
 
 So every subscriber will get the same events and will not lose any events - this behavior is named **'cold observable'**
-
+See [Hot Publishers](hot-publisher) to understand 
 ```java
 Observable<Integer> observable = Observable.create(subscriber -> {
    log.info("Started emitting");
@@ -197,8 +197,8 @@ will output
 ## Observable / Flowable lifecycle
 
 ### Operators
-Between the source Observable / Flowable and the Subscriber there can be a wide range of operators and there are lots
-of operators to chose from. Probably you are already familiar with functional operations like **filter** and **map**. 
+Between the source Observable / Flowable and the Subscriber there can be a wide range of operators and RxJava provides 
+lots of operators to chose from. Probably you are already familiar with functional operations like **filter** and **map**. 
 so let's use them as example:
 
 ```java
