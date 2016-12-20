@@ -153,8 +153,7 @@ When subscribing to an Observable/Flowable, the create() method gets executed fo
 inside create are re-emitted to each subscriber independently. 
 
 So every subscriber will get the same events and will not lose any events - this behavior is named **'cold observable'**
-See [Hot Publishers](hot-publisher) to understand how 
-
+See [Hot Publishers](#hot-publisher) to understand 
 ```java
 Observable<Integer> observable = Observable.create(subscriber -> {
    log.info("Started emitting");
@@ -1211,8 +1210,11 @@ that the subscriber cannot process.
 Backpressure relates to a feedback mechanism through which the subscriber can signal to the producer how much data 
 it can consume and so to produce only that amount.
 
-The [reactive-streams](https://github.com/reactive-streams/reactive-streams-jvm) section above we saw that besides the onNext, onError and onComplete handlers, the Subscriber
-has an **onSubscribe(Subscription)**
+The [reactive-streams](https://github.com/reactive-streams/reactive-streams-jvm) section above we saw that besides the 
+**onNext, onError** and **onComplete** handlers, the Subscriber
+has an **onSubscribe(Subscription)**, Subscription through which it can signal upstream it's ready to receive a number 
+of items and after it processes the items request another batch.
+
 
 ```java
 public interface Subscriber<T> {
@@ -1225,8 +1227,7 @@ public interface Subscriber<T> {
 }
 ```
 
-Subscription through which it can signal upstream it's ready to receive a number of items and after it
-processes the items request another batch.
+The methods exposed by **Subscription** through which the subscriber comunicates with the upstream:
 
 ```java
 public interface Subscription {
@@ -1234,10 +1235,11 @@ public interface Subscription {
     public void cancel();
 }
 ```
+
 So in theory the Subscriber can prevent being overloaded by requesting an initial number of items. The Publisher would
 send those items downstream and not produce any more, until the Subscriber would request more. We say in theory because
-until now we did not see a custom **onSubscribe** request being implemented. This is because if not specified explicitly,
-there is a default implementation which requests of Long.MAX_VALUE which basically means "send all you have".
+until now we did not see a custom **onSubscribe(Subscription)** request being implemented. This is because if not specified explicitly,
+there is a default implementation which requests of **Long.MAX_VALUE** which basically means "send all you have".
 
 Neither did we see the code in the producer that takes consideration of the number of items requested by the subscriber. 
 
