@@ -7,7 +7,6 @@ import io.reactivex.flowables.GroupedFlowable;
 import io.reactivex.schedulers.Schedulers;
 import javafx.util.Pair;
 import org.junit.Test;
-import org.reactivestreams.Publisher;
 
 import java.util.concurrent.TimeUnit;
 
@@ -121,19 +120,16 @@ public class Part06FlatMapOperator implements BaseTestObservables {
     /**
      * Simulated remote operation that emits as many events as the length of the color string
      * @param color color
-     * @return
+     * @return stream of events
      */
     private Flowable<String> simulateRemoteOperation(String color) {
         return Flowable.<String>create(subscriber -> {
-            Runnable asyncRun = () -> {
-                for (int i = 0; i < color.length(); i++) {
-                    subscriber.onNext(color + i);
-                    Helpers.sleepMillis(200);
-                }
+            for (int i = 0; i < color.length(); i++) {
+                subscriber.onNext(color + i);
+                Helpers.sleepMillis(200);
+            }
 
-                subscriber.onComplete();
-            };
-            new Thread(asyncRun).start();
+            subscriber.onComplete();
         }, BackpressureStrategy.BUFFER);
     }
 

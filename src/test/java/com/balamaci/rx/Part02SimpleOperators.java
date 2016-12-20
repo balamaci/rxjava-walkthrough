@@ -1,5 +1,6 @@
 package com.balamaci.rx;
 
+import com.balamaci.rx.util.Helpers;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
 import org.junit.Test;
@@ -7,6 +8,7 @@ import org.junit.Test;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -20,20 +22,27 @@ public class Part02SimpleOperators implements BaseTestObservables {
      *
      * The delay operator uses a Scheduler {@see Part07Schedulers} by default, which actually means it's
      * running the operators and the subscribe operations on a different thread, which means the test method
-     * will terminate before we see the text from the log.
+     * will terminate before we see the text from the log. That is why we use the CountDownLatch waiting for the
+     * completion of the stream.
      *
      */
     @Test
     public void delayOperator() {
         log.info("Starting");
-        Flowable.range(0, 5)
+
+        CountDownLatch latch = new CountDownLatch(1);
+        Flowable.range(0, 2)
                 .doOnNext(val -> log.info("Emitted {}", val))
                 .delay(5, TimeUnit.SECONDS)
-                .blockingSubscribe(
+                .subscribe(
                         tick -> log.info("Tick {}", tick),
                         (ex) -> log.info("Error emitted"),
-                        () -> log.info("Completed"));
-//        Helpers.sleepMillis(10000);
+                        () -> {
+                            log.info("Completed");
+                            latch.countDown();
+                        });
+
+        Helpers.wait(latch);
     }
 
     /**

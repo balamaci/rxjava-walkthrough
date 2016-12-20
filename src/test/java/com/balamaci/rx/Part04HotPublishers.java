@@ -55,8 +55,6 @@ public class Part04HotPublishers implements BaseTestObservables {
      * PublishSubject - doesn't keep a buffer but instead, meaning if another subscriber subscribes later, it's going to loose events
      */
 
-    private int counter = 0;
-
     @Test
     public void replaySubject() {
         Subject<Integer> subject = ReplaySubject.createWithSize(50);
@@ -171,10 +169,50 @@ public class Part04HotPublishers implements BaseTestObservables {
     }
 
     @Test
-    public void connectableObservableAutomaticSubscription() {
+    public void autoConnectingWithFirstSubscriber() {
         ConnectableObservable<Integer> connectableObservable = Observable.<Integer>create(subscriber -> {
             log.info("Inside create()");
 
+            //simulating some listener that produces events after
+            //connection is initialized
+            ResourceConnectionHandler resourceConnectionHandler = new ResourceConnectionHandler() {
+                @Override
+                public void onMessage(Integer message) {
+                 log.info("Emitting {}", message);
+                 subscriber.onNext(message);
+                }
+            };
+
+            resourceConnectionHandler.connect();
+
+            subscriber.setCancellable(resourceConnectionHandler::disconnect);
+        }).publish();
+
+        Observable<Integer> observable = connectableObservable.autoConnect();
+
+        CountDownLatch latch = new CountDownLatch(2);
+        observable
+                .take(5)
+                .subscribe((val) -> log.info("Subscriber1 received: {}", val), logError(), logComplete(latch));
+        Helpers.sleepMillis(1000);
+
+        observable
+                .take(2)
+                .subscribe((val) -> log.info("Subscriber2 received: {}", val), logError(), logComplete(latch));
+
+        Helpers.wait(latch);
+    }
+
+    /**
+     *
+     */
+    @Test
+    public void refCountTheConnectableObservableAutomaticSubscriptionOperator() {
+        ConnectableObservable<Integer> connectableObservable = Observable.<Integer>create(subscriber -> {
+            log.info("Inside create()");
+
+            //simulating some listener that produces events after
+            //connection is initialized
             ResourceConnectionHandler resourceConnectionHandler = new ResourceConnectionHandler() {
                 @Override
                 public void onMessage(Integer message) {
@@ -199,12 +237,20 @@ public class Part04HotPublishers implements BaseTestObservables {
         Helpers.sleepMillis(1000);
 
         log.info("Subscribing 2nd");
+        //we're not seing the code inside .create() reexecuted
         observable
                 .take(2)
                 .subscribe((val) -> log.info("Subscriber2 received: {}", val), logError(), logComplete(latch));
+
         Helpers.wait(latch);
 
-        log.info("Subscribing 2nd");
+        //subscribing another after previous Subscribers unsubscribed
+        latch = new CountDownLatch(1);
+        log.info("Subscribing 3rd");
+        observable
+                .take(1)
+                .subscribe((val) -> log.info("Subscriber3 received: {}", val), logError(), logComplete(latch));
+        Helpers.wait(latch);
     }
 
 
