@@ -832,7 +832,7 @@ Observable<Customer> customers = customerIds
     We use a simulated remote call that might return asynchronous as many events as the length of the color string
 
 ```java
-    private Observable<String> simulateRemoteOperation(String color) {
+    private Observable<String> simulatedRemoteOperation(String color) {
         return Observable.<String>create(subscriber -> {
                     Runnable asyncRun = () -> {
                         for (int i = 0; i < color.length(); i++) {
@@ -857,7 +857,7 @@ to invoke the remote operation:
 
 ```java
 Observable<String> colors = Observable.just("orange", "red", "green")
-         .flatMap(colorName -> simulateRemoteOperation(colorName));
+         .flatMap(colorName -> simulatedRemoteOperation(colorName));
 
 colors.subscribe(val -> log.info("Subscriber received: {}", val));         
 
@@ -1106,6 +1106,7 @@ returns
 ```
 
 When you want to retry considering the thrown exception type:
+
 ```java
 Observable<String> colors = Observable.just("blue", "red", "black", "yellow")
          .flatMap(colorName -> simulateRemoteOperation(colorName)
@@ -1482,7 +1483,7 @@ In the case of _onBackpressureBuffer_ it adds in an internal queue and send down
 _onBackpressureDrop_ just discards events that are received from upstream more than requested from downstream, 
 _onBackpressureLatest_ also drops emitted events excluding the last emitted event(most recent).  
 
-```
+```java
 Flowable<Integer> flowable = createFlowable(10, BackpressureStrategy.MISSING)
                 .onBackpressureBuffer(5, () -> log.info("Buffer has overflown"));
 
@@ -1534,6 +1535,7 @@ onBackpressureXXX operator overrides the previous one if they are chained.
 
 Of course for implementing an event dropping strategy after a full buffer, there is the special overrided
 version of **onBackpressureBuffer** that takes a **BackpressureOverflowStrategy**.
+
 ```java
 Flowable<Integer> flowable = createFlowable(10, BackpressureStrategy.MISSING)
                 .onBackpressureBuffer(5, () -> log.info("Buffer has overflown"),
