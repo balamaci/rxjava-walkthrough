@@ -1080,7 +1080,7 @@ Timeout operator raises exception when there are no events incoming before it's 
 ### retry()
 **retry()** - resubscribes in case of exception to the Observable
 
-```
+```java
 Flowable<String> colors = Flowable.just("red", "blue", "green", "yellow")
        .concatMap(color -> delayedByLengthEmitter(TimeUnit.SECONDS, color) 
                              //if there are no events flowing in the timeframe   
