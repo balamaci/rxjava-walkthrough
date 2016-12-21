@@ -146,14 +146,17 @@ public void observablesAreLazy() {
     });
     log.info("Finished"); 
 }
+===========
+[main] - Finished
 ```
 
 ### Multiple subscriptions to the same Observable / Flowable 
-When subscribing to an Observable/Flowable, the create() method gets executed for each subscription this means that the events 
-inside create are re-emitted to each subscriber independently. 
+When subscribing to an Observable/Flowable, the create() method gets executed for each Subscriber, the events 
+inside **create(..)** are re-emitted to each subscriber independently. 
 
 So every subscriber will get the same events and will not lose any events - this behavior is named **'cold observable'**
-See [Hot Publishers](#hot-publisher) to understand 
+See [Hot Publishers](#hot-publisher) to understand sharing a subscription and multicasting events.
+ 
 ```java
 Observable<Integer> observable = Observable.create(subscriber -> {
    log.info("Started emitting");
