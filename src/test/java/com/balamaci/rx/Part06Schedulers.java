@@ -34,7 +34,7 @@ import java.util.concurrent.Executors;
  *
  * @author sbalamaci
  */
-public class Part07Schedulers implements BaseTestObservables {
+public class Part06Schedulers implements BaseTestObservables {
 
     @Test
     public void subscribingThread() {

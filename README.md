@@ -10,8 +10,8 @@ also available for [reactor-core](https://github.com/balamaci/reactor-core-playg
    - [Simple Operators](#simple-operators)
    - [Merging Streams](#merging-streams)
    - [Hot Publishers](#hot-publishers)
-   - [FlatMap Operator](#flatmap-operator)
    - [Schedulers](#schedulers)
+   - [FlatMap Operator](#flatmap-operator)
    - [Error Handling](#error-handling)
    - [Backpressure](#backpressure)
    - [Articles and books](#articles)
@@ -621,7 +621,7 @@ subject.onComplete();
 
 ### ConnectableObservable / ConnectableFlowable and resource sharing
 There are cases when we want to share a single subscription between subscribers, meaning while the code that executes
-on subscribing should be executed once, the events should be published to all .     
+on subscribing should be executed once, the events should be published to all subscribers.     
 
 For ex. when we want to share a connection between multiple Observables / Flowables. 
 Using a plain Observable would just reexecute the code inside _.create()_ and opening / closing a new connection for each 
@@ -716,7 +716,7 @@ connectableStream
       .subscribe((val) -> log.info("Subscriber2 received: {}", val), 
                     logError(), logComplete(latch));
 
-//waiting for the stream to complete
+//waiting for the streams to complete
 Helpers.wait(latch);
 
 //subscribing another after previous Subscribers unsubscribed
@@ -816,49 +816,38 @@ and these results are emitted back as elements to the subscribers downstream
 
 **Rules of thumb** to consider before getting comfortable with flatMap: 
    
-   - When you have an 'item' and you'll get Observable&lt;X&gt;, instead of X, you need flatMap. Most common example is when you want 
-   to make a remote call that returns an Observable. For ex if you have a stream of customerIds, and downstream you
-    want to work with actual Customer objects:
-    
-```java   
-Observable<Customer> getCustomer(Integer customerId) {..}
-...
+   - When you have an 'item' **T** and a method **T -&gt; Flowable&lt;X&gt;**, you need flatMap. Most common example is when you want 
+   to make a remote call that returns an Observable / Flowable . For ex if you have a stream of customerIds, and downstream you
+    want to work with actual Customer objects:    
    
-Observable<Integer> customerIds = Observable.of(1,2,3,4);
-Observable<Customer> customers = customerIds
-                                 .flatMap(customerId -> getCustomer(customerId));
-```
-   
-   - When you have Observable&lt;Observable&lt;T&gt;&gt; you probably need flatMap.
+   - When you have Observable&lt;Observable&lt;T&gt;&gt;(aka stream of streams) you probably need flatMap. Because flatMap means you are subscribing
+   to each substream.
 
-    We use a simulated remote call that might return asynchronous as many events as the length of the color string
+We use a simulated remote call that might return asynchronous as many events as the length of the color string
 
 ```java
-    private Observable<String> simulatedRemoteOperation(String color) {
-        return Observable.<String>create(subscriber -> {
-                    Runnable asyncRun = () -> {
-                        for (int i = 0; i < color.length(); i++) {
-                            subscriber.onNext(color + i);
-                            Helpers.sleepMillis(200);
-                        }
-        
-                        subscriber.onCompleted();
-                    };
-                    new Thread(asyncRun).start();
-                });
+private Flowable<String> simulateRemoteOperation(String color) {
+        return Flowable.<String>create(subscriber -> {
+            for (int i = 0; i < color.length(); i++) {
+                subscriber.onNext(color + i);
+                Helpers.sleepMillis(200);
+            }
+
+            subscriber.onComplete();
+        }, BackpressureStrategy.MISSING);
     }
 ```
 
 If we have a stream of color names:
 
 ```java
-Observable<String> colors = Observable.just("orange", "red", "green")
+Flowable<String> colors = Flowable.just("orange", "red", "green")
 ```
 
 to invoke the remote operation: 
 
 ```java
-Observable<String> colors = Observable.just("orange", "red", "green")
+Flowable<String> colors = Flowable.just("orange", "red", "green")
          .flatMap(colorName -> simulatedRemoteOperation(colorName));
 
 colors.subscribe(val -> log.info("Subscriber received: {}", val));         
@@ -881,9 +870,9 @@ colors.subscribe(val -> log.info("Subscriber received: {}", val));
 ```
 
 Notice how the results are coming intertwined. This is because flatMap actually subscribes to it's inner Observables 
-returned from 'simulateRemoteOperation'. You can specify the concurrency level of flatMap as a parameter. Meaning 
-you can say how many of the substreams should be subscribed "concurrently" - aka before the onComplete 
-event is triggered on the substreams.
+returned from 'simulateRemoteOperation'. You can specify the **concurrency level of flatMap** as a parameter. Meaning 
+you can say how many of the substreams should be subscribed "concurrently" - after **onComplete** is triggered on the substreams,
+a new substream is subscribed-.
 
 By setting the concurrency to **1** we don't subscribe to other substreams until the current one finishes:
 

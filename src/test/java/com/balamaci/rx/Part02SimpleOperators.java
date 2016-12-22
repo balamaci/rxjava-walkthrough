@@ -20,7 +20,7 @@ public class Part02SimpleOperators implements BaseTestObservables {
      * Delay operator - the Thread.sleep of the reactive world, it's pausing for a particular increment of time
      * before emitting the whole range events which are thus shifted by the specified time amount.
      *
-     * The delay operator uses a Scheduler {@see Part07Schedulers} by default, which actually means it's
+     * The delay operator uses a Scheduler {@see Part06Schedulers} by default, which actually means it's
      * running the operators and the subscribe operations on a different thread, which means the test method
      * will terminate before we see the text from the log. That is why we use the CountDownLatch waiting for the
      * completion of the stream.

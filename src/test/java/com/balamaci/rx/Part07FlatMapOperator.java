@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit;
  *
  * @author sbalamaci
  */
-public class Part06FlatMapOperator implements BaseTestObservables {
+public class Part07FlatMapOperator implements BaseTestObservables {
 
     /**
      * Common usecase when for each item you make an async remote call that returns a stream of items (an Observable<T>)
@@ -75,7 +75,7 @@ public class Part06FlatMapOperator implements BaseTestObservables {
         Flowable<String> colors = Flowable.just("orange", "red", "green")
                 .flatMap(val -> simulateRemoteOperation(val), 1);
 
-        subscribeWithLog(colors);
+        subscribeWithLogWaiting(colors);
     }
 
     /**
@@ -98,8 +98,8 @@ public class Part06FlatMapOperator implements BaseTestObservables {
      * When you have a Stream of Streams - Observable<Observable<T>>
      */
     @Test
-    public void flatMapFor() {
-        Flowable<String> colors = Flowable.fromArray("red", "green", "blue",
+    public void flatMapForProcessingAStreamOfStreams() {
+        Flowable<String> colors = Flowable.just("red", "green", "blue",
                 "red", "yellow", "green", "green");
 
         Flowable<GroupedFlowable<String, String>> groupedColorsStream = colors
@@ -130,7 +130,7 @@ public class Part06FlatMapOperator implements BaseTestObservables {
             }
 
             subscriber.onComplete();
-        }, BackpressureStrategy.BUFFER);
+        }, BackpressureStrategy.MISSING);
     }
 
 }
