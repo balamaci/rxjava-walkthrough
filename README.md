@@ -700,8 +700,8 @@ ConnectableObservable<Integer> connectableStream = Observable.<Integer>create(su
    subscriber.setCancellable(resourceConnectionHandler::disconnect);
 }).publish(); 
 
+//publish().refCount() have been joined together in the .share() operator
 Observable<Integer> observable = connectableObservable.refCount();
-//publish().refCount() equals share()
 
 CountDownLatch latch = new CountDownLatch(2);
 connectableStream

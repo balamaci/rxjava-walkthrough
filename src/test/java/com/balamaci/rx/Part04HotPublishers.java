@@ -176,7 +176,7 @@ public class Part04HotPublishers implements BaseTestObservables {
     }
 
     /**
-     * We can get away
+     * We can get away with having to call ourselves .connect(), by using
      */
     @Test
     public void autoConnectingWithFirstSubscriber() {
@@ -214,7 +214,7 @@ public class Part04HotPublishers implements BaseTestObservables {
     }
 
     /**
-     *
+     * Even the above .autoConnect() can be improved
      */
     @Test
     public void refCountTheConnectableObservableAutomaticSubscriptionOperator() {
