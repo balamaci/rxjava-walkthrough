@@ -227,7 +227,7 @@ public class Part01CreateFlowable implements BaseTestObservables {
         Helpers.sleepMillis(2000);
 
         log.info("Subscribing");
-        subscribeWithLogWaiting(stream);
+        subscribeWithLogOutputWaiting(stream);
     }
 
     private String blockingOperation() {

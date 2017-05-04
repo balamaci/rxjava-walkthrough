@@ -128,18 +128,21 @@ public class Part04HotPublishers implements BaseTestObservables {
 
 
     /**
-     * ConnectableObservable
+     * ConnectableObservable is a special kind of Observable that when calling .subscribe()
+     * it just keeps a reference to its subscribers, it only subscribes once the .connect() method is called
      */
     @Test
     public void sharingResourcesBetweenSubscriptions() {
         ConnectableObservable<Integer> connectableObservable = Observable.<Integer>create(subscriber -> {
             log.info("Inside create()");
 
-            //A JMS connection listener example
-//            Connection connection = connectionFactory.createConnection();
-//            Session session = connection.createSession(true, AUTO_ACKNOWLEDGE);
-//            MessageConsumer consumer = session.createConsumer(orders);
-//            consumer.setMessageListener(subscriber::onNext);
+            /* A JMS connection listener example
+               Just an example of a costly operation that is better to be shared **/
+
+            /* Connection connection = connectionFactory.createConnection();
+              Session session = connection.createSession(true, AUTO_ACKNOWLEDGE);
+              MessageConsumer consumer = session.createConsumer(orders);
+              consumer.setMessageListener(subscriber::onNext); */
 
             subscriber.setCancellable(() -> log.info("Subscription cancelled"));
 
@@ -150,10 +153,13 @@ public class Part04HotPublishers implements BaseTestObservables {
             subscriber.onNext(2);
 
             subscriber.onComplete();
-        }).publish();
+        }).publish(); //calling .publish makes an Observable a ConnectableObservable
 
         log.info("Before subscribing");
         CountDownLatch latch = new CountDownLatch(2);
+
+        /* calling .subscribe() bellow doesn't actually subscribe, but puts them in a list to actually subscribe
+           when calling .connect() */
         connectableObservable
                 .take(1)
                 .subscribe((val) -> log.info("Subscriber1 received: {}", val), logError(), logComplete(latch));
@@ -162,12 +168,16 @@ public class Part04HotPublishers implements BaseTestObservables {
                 .subscribe((val) -> log.info("Subscriber2 received: {}", val), logError(), logComplete(latch));
 
 
+        //we need to call .connect() to trigger the real subscription
         log.info("Now connecting to the ConnectableObservable");
         connectableObservable.connect();
 
         Helpers.wait(latch);
     }
 
+    /**
+     * We can get away
+     */
     @Test
     public void autoConnectingWithFirstSubscriber() {
         ConnectableObservable<Integer> connectableObservable = Observable.<Integer>create(subscriber -> {
@@ -183,7 +193,7 @@ public class Part04HotPublishers implements BaseTestObservables {
                 }
             };
 
-            resourceConnectionHandler.connect();
+            resourceConnectionHandler.openConnection();
 
             subscriber.setCancellable(resourceConnectionHandler::disconnect);
         }).publish();
@@ -220,8 +230,7 @@ public class Part04HotPublishers implements BaseTestObservables {
                     subscriber.onNext(message);
                 }
             };
-
-            resourceConnectionHandler.connect();
+            resourceConnectionHandler.openConnection();
 
             subscriber.setCancellable(resourceConnectionHandler::disconnect);
         }).publish();
@@ -237,14 +246,15 @@ public class Part04HotPublishers implements BaseTestObservables {
         Helpers.sleepMillis(1000);
 
         log.info("Subscribing 2nd");
-        //we're not seing the code inside .create() reexecuted
+        //we're not seeing the code inside .create() re-executed
         observable
                 .take(2)
                 .subscribe((val) -> log.info("Subscriber2 received: {}", val), logError(), logComplete(latch));
 
         Helpers.wait(latch);
 
-        //subscribing another after previous Subscribers unsubscribed
+        //Previous Subscribers all unsubscribed, subscribing another will trigger the execution of the code
+        //inside .create()
         latch = new CountDownLatch(1);
         log.info("Subscribing 3rd");
         observable
@@ -271,7 +281,7 @@ public class Part04HotPublishers implements BaseTestObservables {
 
         private int counter;
 
-        public void connect() {
+        public void openConnection() {
             log.info("**Opening connection");
 
             scheduledExecutorService = periodicEventEmitter(() -> {

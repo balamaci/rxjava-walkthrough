@@ -625,13 +625,13 @@ on subscribing should be executed once, the events should be published to all su
 
 For ex. when we want to share a connection between multiple Observables / Flowables. 
 Using a plain Observable would just reexecute the code inside _.create()_ and opening / closing a new connection for each 
-new subscriber when it subscribes / cancels it's subscription.
+new subscriber when it subscribes / cancels its subscription.
 
 **ConnectableObservable** are a special kind of **Observable**. No matter how many Subscribers subscribe to ConnectableObservable, 
 it opens just one subscription to the Observable from which it was created.
 
 Anyone who subscribes to **ConnectableObservable** is placed in a set of Subscribers(it doesn't trigger
-the _.create()_ code a normal Observable would invoke). A **.connect()** method is available for ConnectableObservable.
+the _.create()_ code a normal Observable would when .subscribe() is called). A **.connect()** method is available for ConnectableObservable.
 **As long as connect() is not called, these Subscribers are put on hold, they never directly subscribe to upstream Observable**
 
 ```java
@@ -639,11 +639,13 @@ ConnectableObservable<Integer> connectableObservable =
                                   Observable.<Integer>create(subscriber -> {
         log.info("Inside create()");
 
-        // A JMS connection listener could have been used
-        //Connection connection = connectionFactory.createConnection();
-        //Session session = connection.createSession(true, AUTO_ACKNOWLEDGE);
-        //MessageConsumer consumer = session.createConsumer(orders);
-        //consumer.setMessageListener(subscriber::onNext);
+     /* A JMS connection listener example
+         Just an example of a costly operation that is better to be shared **/
+
+     /* Connection connection = connectionFactory.createConnection();
+        Session session = connection.createSession(true, AUTO_ACKNOWLEDGE);
+        MessageConsumer consumer = session.createConsumer(orders);
+        consumer.setMessageListener(subscriber::onNext); */
 
         subscriber.setCancellable(() -> log.info("Subscription cancelled"));
 
@@ -692,7 +694,7 @@ ConnectableObservable<Integer> connectableStream = Observable.<Integer>create(su
              subscriber.onNext(message);
         }
    };
-   resourceConnectionHandler.connect();
+   resourceConnectionHandler.openConnection();
 
    //when the last subscriber unsubscribes it will invoke disconnect on the resourceConnectionHandler
    subscriber.setCancellable(resourceConnectionHandler::disconnect);
@@ -733,7 +735,7 @@ private abstract class ResourceConnectionHandler {
 
    private int counter;
 
-   public void connect() {
+   public void openConnection() {
       log.info("**Opening connection");
 
       scheduledExecutorService = periodicEventEmitter(() -> {
