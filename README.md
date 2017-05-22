@@ -323,12 +323,12 @@ Flowable.interval(5, TimeUnit.SECONDS)
 
 ==========
 12:17:56 [main] - Starting
-12:17:57 [RxComputationThreadPool-1] - Subscriber received: 0
-12:17:58 [RxComputationThreadPool-1] - Subscriber received: 1
-12:17:59 [RxComputationThreadPool-1] - Subscriber received: 2
-12:18:00 [RxComputationThreadPool-1] - Subscriber received: 3
-12:18:01 [RxComputationThreadPool-1] - Subscriber received: 4
-12:18:01 [RxComputationThreadPool-1] - Subscriber got Completed event
+12:18:01 [RxComputationThreadPool-1] - Subscriber received: 0
+12:18:06 [RxComputationThreadPool-1] - Subscriber received: 1
+12:18:11 [RxComputationThreadPool-1] - Subscriber received: 2
+12:18:16 [RxComputationThreadPool-1] - Subscriber received: 3
+12:18:21 [RxComputationThreadPool-1] - Subscriber received: 4
+12:18:21 [RxComputationThreadPool-1] - Subscriber got Completed event
 ```
 
 
