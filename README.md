@@ -484,6 +484,7 @@ events which it combines with the zip function and sends downstream.
 
 ### merge
 Merge operator combines one or more stream and passes events downstream as soon as they appear.
+
 ![merge](https://raw.githubusercontent.com/reactor/projectreactor.io/master/src/main/static/assets/img/marble/merge.png)
 
 ```
@@ -491,6 +492,9 @@ Flowable<String> colors = periodicEmitter("red", "green", "blue", 2, TimeUnit.SE
 
 Flowable<Long> numbers = Flowable.interval(1, TimeUnit.SECONDS)
                 .take(5);
+                
+//notice we can't say Flowable<String> or Flowable<Long> as the return stream o the merge operator since 
+//it can emit either a color or number.                  
 Flowable flowable = Flowable.merge(colors, numbers);                
 
 ============
@@ -816,14 +820,17 @@ and these results are emitted back as elements to the subscribers downstream
 
 **Rules of thumb** to consider before getting comfortable with flatMap: 
    
-   - When you have an 'item' **T** and a method **T -&gt; Flowable&lt;X&gt;**, you need flatMap. Most common example is when you want 
+   - When you have an 'item' **T** and a method **T -&lt; Flowable&lt;X&gt;**, you need flatMap. Most common example is when you want 
    to make a remote call that returns an Observable / Flowable . For ex if you have a stream of customerIds, and downstream you
     want to work with actual Customer objects:    
    
    - When you have Observable&lt;Observable&lt;T&gt;&gt;(aka stream of streams) you probably need flatMap. Because flatMap means you are subscribing
    to each substream.
 
-We use a simulated remote call that might return asynchronous as many events as the length of the color string
+We use a simulated remote call that returns asynchronous events. This is a most common scenario to make a remote call for each stream element, 
+(although in non reactive world we're more likely familiar with remote operations returning Lists **T -&gt; List&lt;X&gt;**).
+Our simulated remote operation produces as many events as the length of the color string received as parameter every 200ms, 
+so for example **red : red0, red1, red2** 
 
 ```java
 private Flowable<String> simulateRemoteOperation(String color) {
@@ -869,7 +876,7 @@ colors.subscribe(val -> log.info("Subscriber received: {}", val));
 16:44:16 [Thread-0]- Subscriber received: orange5
 ```
 
-Notice how the results are coming intertwined. This is because flatMap actually subscribes to it's inner Observables 
+Notice how the results are coming intertwined(mixed) and it might not be as you expected it.This is because flatMap actually subscribes to it's inner Observables 
 returned from 'simulateRemoteOperation'. You can specify the **concurrency level of flatMap** as a parameter. Meaning 
 you can say how many of the substreams should be subscribed "concurrently" - after **onComplete** is triggered on the substreams,
 a new substream is subscribed-.
@@ -877,7 +884,7 @@ a new substream is subscribed-.
 By setting the concurrency to **1** we don't subscribe to other substreams until the current one finishes:
 
 ```
-Observable<String> colors = Observable.just("orange", "red", "green")
+Flowable<String> colors = Flowable.just("orange", "red", "green")
                      .flatMap(val -> simulateRemoteOperation(val), 1); //
 
 ```
@@ -918,6 +925,8 @@ Observable<Pair<String, Integer>> colorsCounted = colors
                }
     );
 ```
+
+
 
 ## Error handling
 Code at [Part08ErrorHandling.java](https://github.com/balamaci/rxjava-playground/blob/master/src/test/java/com/balamaci/rx/Part08ErrorHandling.java)
