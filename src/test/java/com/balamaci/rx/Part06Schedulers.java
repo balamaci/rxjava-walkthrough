@@ -85,7 +85,7 @@ public class Part06Schedulers implements BaseTestObservables {
                     return newValue;
                 });
 
-        subscribeWithLogWaiting(observable);
+        subscribeWithLogOutputWaiting(observable);
     }
 
 
@@ -108,7 +108,7 @@ public class Part06Schedulers implements BaseTestObservables {
                 })
                 .observeOn(Schedulers.newThread());
 
-        subscribeWithLogWaiting(observable);
+        subscribeWithLogOutputWaiting(observable);
     }
 
     /**
@@ -128,7 +128,7 @@ public class Part06Schedulers implements BaseTestObservables {
                     return newValue;
                 });
 
-        subscribeWithLogWaiting(observable);
+        subscribeWithLogOutputWaiting(observable);
     }
 
     /**
@@ -152,7 +152,7 @@ public class Part06Schedulers implements BaseTestObservables {
                                     .subscribeOn(Schedulers.from(fixedThreadPool))
                 );
 
-        subscribeWithLogWaiting(observable);
+        subscribeWithLogOutputWaiting(observable);
     }
 
     private Flowable<String> simulateRemoteOp(Integer val) {

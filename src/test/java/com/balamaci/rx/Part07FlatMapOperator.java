@@ -38,7 +38,7 @@ public class Part07FlatMapOperator implements BaseTestObservables {
         Flowable<String> colors = Flowable.just("orange", "red", "green")
                 .flatMap(colorName -> simulateRemoteOperation(colorName));
 
-        subscribeWithLogWaiting(colors);
+        subscribeWithLogOutputWaiting(colors);
     }
 
     /**
@@ -60,22 +60,22 @@ public class Part07FlatMapOperator implements BaseTestObservables {
                     }
                 );
 
-        subscribeWithLogWaiting(colorsCounted);
+        subscribeWithLogOutputWaiting(colorsCounted);
     }
 
 
     /**
      * Controlling the level of concurrency of the substreams.
-     * In the ex. below, only the first two substreams(the Observables returned by simulateRemoteOperation)
-     * are subscribed. As soon as one of them completes, another substream is subscribed.
-     *
+     * In the ex. below, only one of the substreams(the Observables returned by simulateRemoteOperation)
+     * is subscribed. As soon the substream completes, another substream is subscribed.
+     * Since only one substream is subscribed at any time, this way we don't see any values interleaved
      */
     @Test
     public void flatMapConcurrency() {
         Flowable<String> colors = Flowable.just("orange", "red", "green")
                 .flatMap(val -> simulateRemoteOperation(val), 1);
 
-        subscribeWithLogWaiting(colors);
+        subscribeWithLogOutputWaiting(colors);
     }
 
     /**
@@ -91,7 +91,7 @@ public class Part07FlatMapOperator implements BaseTestObservables {
                 .subscribeOn(Schedulers.io())
                 .concatMap(val -> simulateRemoteOperation(val));
 
-        subscribeWithLogWaiting(colors);
+        subscribeWithLogOutputWaiting(colors);
     }
 
     /**
@@ -114,7 +114,7 @@ public class Part07FlatMapOperator implements BaseTestObservables {
                                                                     .toFlowable()
                                         );
 
-        subscribeWithLogWaiting(countedColors);
+        subscribeWithLogOutputWaiting(countedColors);
     }
 
     /**

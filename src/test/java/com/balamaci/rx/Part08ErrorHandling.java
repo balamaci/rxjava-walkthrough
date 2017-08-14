@@ -205,7 +205,7 @@ public class Part08ErrorHandling implements BaseTestObservables {
                                                 .delay(2, TimeUnit.SECONDS)
                                           )
                                 .take(10);
-        subscribeWithLogWaiting(remoteOperation);
+        subscribeWithLogOutputWaiting(remoteOperation);
     }
 
     private Flowable<String> simulateRemoteOperation(String color) {
@@ -218,20 +218,12 @@ public class Part08ErrorHandling implements BaseTestObservables {
             int attempts = attemptsHolder.incrementAndGet();
 
             if ("red".equals(color)) {
-                if(attempts < workAfterAttempts) {
-                    log.info("Emitting RuntimeException for {}", color);
-                    throw new RuntimeException("Color red raises exception");
-                } else {
-                    log.info("After attempt {} we don't throw exception", attempts);
-                }
+                checkAndThrowException(color, attempts, workAfterAttempts,
+                        new RuntimeException("Color red raises exception"));
             }
             if ("black".equals(color)) {
-                if(attempts < workAfterAttempts) {
-                    log.info("Emitting IllegalArgumentException for {}", color);
-                    throw new IllegalArgumentException("Black is not a color");
-                } else {
-                    log.info("After attempt {} we don't throw exception", attempts);
-                }
+                checkAndThrowException(color, attempts, workAfterAttempts,
+                        new IllegalArgumentException("Black is not a color"));
             }
 
             String value = "**" + color + "**";
@@ -242,5 +234,12 @@ public class Part08ErrorHandling implements BaseTestObservables {
         }, BackpressureStrategy.BUFFER);
     }
 
-
+    private void checkAndThrowException(String color, int attempts, int workAfterAttempts, Exception exception) {
+        if(attempts < workAfterAttempts) {
+            log.info("Emitting {} for {}",  exception.getClass(), color);
+            throw new IllegalArgumentException("Black is not a color");
+        } else {
+            log.info("After attempt {} we don't throw exception", attempts);
+        }
+    }
 }

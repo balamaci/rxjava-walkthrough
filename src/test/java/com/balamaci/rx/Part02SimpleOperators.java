@@ -52,7 +52,7 @@ public class Part02SimpleOperators implements BaseTestObservables {
     public void timerOperator() {
         log.info("Starting");
         Flowable<Long> flowable = Flowable.timer(5, TimeUnit.SECONDS);
-        subscribeWithLogWaiting(flowable);
+        subscribeWithLogOutputWaiting(flowable);
     }
 
 
@@ -63,7 +63,7 @@ public class Part02SimpleOperators implements BaseTestObservables {
         Flowable<Integer> flowable = Flowable.range(0, 5)
                                     .doOnNext(val -> log.info("Emitted {}", val))
                                     .delay(val -> Flowable.timer(val * 2, TimeUnit.SECONDS));
-        subscribeWithLogWaiting(flowable);
+        subscribeWithLogOutputWaiting(flowable);
     }
 
     /**
@@ -75,7 +75,7 @@ public class Part02SimpleOperators implements BaseTestObservables {
         Flowable<Long> flowable = Flowable.interval(1, TimeUnit.SECONDS)
                                     .take(5);
 
-        subscribeWithLogWaiting(flowable);
+        subscribeWithLogOutputWaiting(flowable);
     }
 
     /**
@@ -136,7 +136,7 @@ public class Part02SimpleOperators implements BaseTestObservables {
                             })
                             .repeat(5);
 
-        subscribeWithLogWaiting(random);
+        subscribeWithLogOutputWaiting(random);
     }
 
 }
