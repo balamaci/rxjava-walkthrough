@@ -126,8 +126,8 @@ public class Part06Schedulers implements BaseTestObservables {
                 .subscribeOn(Schedulers.io())
                 .observeOn(Schedulers.computation())
                 .map(val -> {
-                    int newValue = val * 2;
-                    log.info("Mapping new val {}", newValue);
+                    int newValue = val * 10;
+                    log.info("Mapping {} to {}", val, newValue);
                     return newValue;
                 })
                 .observeOn(Schedulers.newThread());

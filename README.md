@@ -441,7 +441,7 @@ of the zipped streams once each has emitted a value.
 ![Zip](https://raw.githubusercontent.com/reactor/projectreactor.io/master/src/main/static/assets/img/marble/zip.png)
 
 Zip operator besides the streams to zip, also takes as parameter a function which will produce the 
-combined result of the zipped streams once each stream emitted it's value
+combined result of the zipped streams once each stream emitted its value
 
 ```java
 Single<Boolean> isUserBlockedStream = 
@@ -844,14 +844,17 @@ now let's enable that _Thread.sleep(2000)_ above.
 11:42:16 [main] INFO BaseTestObservables - Subscriber received: 20
 ``` 
 as expected nothing changes, just that we receive the events in the Subscriber delayed by 2 secs.
-To prevent this, lots of RxJava operators that involve waiting like **delay**,**interval**, **zip** run on a Scheduler, otherwise they would just block the subscribing thread. 
+To prevent this, lots of RxJava operators that involve waiting as **delay**,**interval**, **zip** run on a Scheduler, otherwise they would just block the subscribing thread. 
 By default **Schedulers.computation()** is used, but the Scheduler can be passed as a parameter to those methods.
 
-Ok so how can we provide different threads to run the different parts o the code.
+Ok so how can we provide different threads to run the different parts of the code.
 
 ### subscribeOn
 As stated above **subscribeOn** allows to specify on which Scheduler thread the subscribtion is made - which thread invokes the code contained in the lambda for Observable.create() -
-Since the operators are lazy and nothing happens until subscription, where the **.subscribeOn()** is called doesn't make any difference. 
+(it's **not** abouth the thread for where the code in **.subscribe((val) -> {...})** gets executed). 
+Since the operators are lazy and nothing happens until subscription, where the **.subscribeOn()** is called doesn't make any difference.
+Also calling **.subscribeOn()** multiple times at different positions doesn't have any effect, only the first **.subscribeOn()** Scheduler is considered.   
+
 
 ```java
 @Test
@@ -877,7 +880,18 @@ public void testSubscribeOn() {
                     return newValue;
                 });
 
-   subscribeWithLogOutputWaitingForComplete(observable);
+   /** Since we are switching the subscription thread we now need to wait 
+   * for the Thread to complete so again we are using the CountDownLatch "trick" to do it.
+   **/    
+   CountDownLatch latch = new CountDownLatch(1);
+   
+   observable.subscribe(
+                logNext(),
+                logError(latch),
+                logComplete(latch)
+   );
+   
+   Helpers.wait(latch);
 }
 
 ===============
@@ -888,6 +902,63 @@ public void testSubscribeOn() {
 13:16:33 [RxCachedThreadScheduler-1] INFO BaseTestObservables - Subscriber received: 10
 13:16:33 [RxCachedThreadScheduler-1] INFO BaseTestObservables - Subscriber got Completed event
 ```
+Notice how the code and also the flow down the operators like **.map()** is switched to this new Scheduler that was specified. 
+
+
+### observeOn
+**observeOn** allows control to which Scheduler executes the code in the downstream operators.
+So by using **observeOn()** we changed the Scheduler for the **map** operator, but notice how the last **.observeOn(Schedulers.newThread())** 
+we also influence the code received by the subscriber, while **.subscribeOn()** just had a part on the code executed before we changed with **.observeOn()**  
+
+```java
+log.info("Starting");
+
+Observable<Integer> observable = 
+        Observable.create(subscriber -> { 
+                    //code that will execute inside the IO Scheduler
+             log.info("Emitting 1st");
+             subscriber.onNext(1);
+ 
+             log.info("Emitting 2nd");
+             subscriber.onNext(2);
+ 
+             subscriber.onComplete();
+        })
+        .subscribeOn(Schedulers.io())
+        .observeOn(Schedulers.computation())
+        .map(val -> {
+              int newValue = val * 10;
+              log.info("Mapping {} to {}", val, newValue);
+              return newValue;
+        })
+        .observeOn(Schedulers.newThread());
+
+   CountDownLatch latch = new CountDownLatch(1);
+   
+   observable.subscribe(
+                logNext(),
+                logError(latch),
+                logComplete(latch)
+   );
+   
+   Helpers.wait(latch);
+
+===============
+19:35:01 [main] INFO BaseTestObservables - Starting
+19:35:01 [RxCachedThreadScheduler-1] INFO BaseTestObservables - Started emitting
+19:35:01 [RxCachedThreadScheduler-1] INFO BaseTestObservables - Emitting 1st
+19:35:01 [RxCachedThreadScheduler-1] INFO BaseTestObservables - Emitting 2nd
+19:35:01 [RxComputationThreadPool-1] INFO BaseTestObservables - Mapping 1 to 10
+19:35:01 [RxNewThreadScheduler-1] INFO BaseTestObservables - Subscriber received: 10
+19:35:01 [RxComputationThreadPool-1] INFO BaseTestObservables - Mapping 2 to 20
+19:35:01 [RxNewThreadScheduler-1] INFO BaseTestObservables - Subscriber received: 20
+19:35:01 [RxNewThreadScheduler-1] INFO BaseTestObservables - Subscriber got Completed event
+```
+
+### back to blocking world 
+How about when we want to switch back to a blocking. We saw above how we need to , switching from legacy code
+might 
+
 
 
 ## Flatmap operator
