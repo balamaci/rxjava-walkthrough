@@ -307,8 +307,8 @@ latch.await();
 
 The **.delay()**, **.interval()** operators uses a [Scheduler](#schedulers) by default which is why we see it executing
 on a different thread _RxComputationThreadPool-1_ which actually means it's running the operators and the subscribe operations 
-on another thread and so the test method will terminate before we see the text from the log unless we wait for the completion of the stream.
-
+on another thread and so the test method will terminate before we see the text from the log unless we wait for the completion of the stream. 
+This is the role of the **CountdownLatch**.
 
 ### interval
 Periodically emits a number starting from 0 and then increasing the value on each emission.
@@ -804,9 +804,90 @@ RxJava provides some general use Schedulers:
   - **Schedulers.newThread()** - always creates a new thread when a worker is needed. Since it's not thread pooled and 
   always creates a new thread instead of reusing one, this scheduler is not very useful 
  
-Although we said by default RxJava doesn't introduce concurrency, lots of operators involve waiting like **delay**,
-**interval**, **zip** need to run on a Scheduler, otherwise they would just block the subscribing thread. 
-By default **Schedulers.computation()** is used, but the Scheduler can be passed as a parameter.
+Although we said by default RxJava doesn't introduce concurrency. Notice how we are not doing anything on another thread
+than the subscribing thread 'main' and the Test doesn't end until the complete event is processed:
+```java
+@Test
+public void byDefaultRxJavaDoesntIntroduceConcurrency() {
+   log.info("Starting");
+
+   Observable.<Integer>create(subscriber -> {
+        log.info("Someone subscribed");
+        subscriber.onNext(1);
+        subscriber.onNext(2);
+
+        subscriber.onComplete();
+   })
+   .map(val -> {
+         log.info("Mapping {}", val);
+         //what if we do some Thread.sleep here 
+         //Thread.sleep(2000);
+         return val * 10;
+   })
+   .subscribe(logNext());
+}
+===============
+11:23:49 [main] INFO BaseTestObservables - Starting
+11:23:50 [main] INFO BaseTestObservables - Someone subscribed
+11:23:50 [main] INFO BaseTestObservables - Mapping 1
+11:23:50 [main] INFO BaseTestObservables - Subscriber received: 10
+11:23:50 [main] INFO BaseTestObservables - Mapping 2
+11:23:50 [main] INFO BaseTestObservables - Subscriber received: 20
+```
+now let's enable that _Thread.sleep(2000)_ above.
+```
+11:42:12 [main] INFO BaseTestObservables - Starting
+11:42:12 [main] INFO BaseTestObservables - Someone subscribed
+11:42:12 [main] INFO BaseTestObservables - Mapping 1
+11:42:14 [main] INFO BaseTestObservables - Subscriber received: 10
+11:42:14 [main] INFO BaseTestObservables - Mapping 2
+11:42:16 [main] INFO BaseTestObservables - Subscriber received: 20
+``` 
+as expected nothing changes, just that we receive the events in the Subscriber delayed by 2 secs.
+To prevent this, lots of RxJava operators that involve waiting like **delay**,**interval**, **zip** run on a Scheduler, otherwise they would just block the subscribing thread. 
+By default **Schedulers.computation()** is used, but the Scheduler can be passed as a parameter to those methods.
+
+Ok so how can we provide different threads to run the different parts o the code.
+
+### subscribeOn
+As stated above **subscribeOn** allows to specify on which Scheduler thread the subscribtion is made - which thread invokes the code contained in the lambda for Observable.create() -
+Since the operators are lazy and nothing happens until subscription, where the **.subscribeOn()** is called doesn't make any difference. 
+
+```java
+@Test
+public void testSubscribeOn() {
+   log.info("Starting");
+
+   Observable<Integer> observable = Observable.create(subscriber -> { 
+       //code that will execute inside the IO ThreadPool
+       log.info("Starting slow network op");
+       Helpers.sleepMillis(2000);
+
+       log.info("Emitting 1st");
+       subscriber.onNext(1);
+
+       subscriber.onComplete();
+   });
+
+   observable = observable
+                .subscribeOn(Schedulers.io()) //Specify execution on the IO Scheduler
+                .map(val -> {
+                    int newValue = val * 10;
+                    log.info("Mapping {} to {}", val, newValue);
+                    return newValue;
+                });
+
+   subscribeWithLogOutputWaitingForComplete(observable);
+}
+
+===============
+13:16:31 [main] INFO BaseTestObservables - Starting
+13:16:31 [RxCachedThreadScheduler-1] INFO BaseTestObservables - Starting slow network op
+13:16:33 [RxCachedThreadScheduler-1] INFO BaseTestObservables - Emitting 1st
+13:16:33 [RxCachedThreadScheduler-1] INFO BaseTestObservables - Mapping 1 to 10
+13:16:33 [RxCachedThreadScheduler-1] INFO BaseTestObservables - Subscriber received: 10
+13:16:33 [RxCachedThreadScheduler-1] INFO BaseTestObservables - Subscriber got Completed event
+```
 
 
 ## Flatmap operator

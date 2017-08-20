@@ -22,7 +22,7 @@ import java.util.concurrent.Executors;
  * - <b>observeOn</b> allows control to which Scheduler executes the code in the downstream operators
  *
  * RxJava provides some general use Schedulers already implemented:
- *  - Schedulers.computation() - to be used for CPU intensive tasks. A threadpool
+ *  - Schedulers.computation() - to be used for CPU intensive tasks. A threadpool equal to the numbers of available CPUs
  *  - Schedulers.io() - to be used for IO bound tasks
  *  - Schedulers.from(Executor) - custom ExecutorService
  *  - Schedulers.newThread() - always creates a new thread when a worker is needed. Since it's not thread pooled
@@ -37,6 +37,26 @@ import java.util.concurrent.Executors;
 public class Part06Schedulers implements BaseTestObservables {
 
     @Test
+    public void byDefaultRxJavaDoesntIntroduceConcurrency() {
+        log.info("Starting");
+
+        Observable.<Integer>create(subscriber -> {
+            log.info("Someone subscribed");
+            subscriber.onNext(1);
+            subscriber.onNext(2);
+
+            subscriber.onComplete();
+        })
+        .map(val -> {
+            int newValue = val * 10;
+            log.info("Mapping {} to {}", val, newValue);
+//            Helpers.sleepMillis(2000);
+            return newValue;
+        })
+        .subscribe(logNext());
+    }
+
+    @Test
     public void subscribingThread() {
         CountDownLatch latch = new CountDownLatch(1);
 
@@ -49,15 +69,17 @@ public class Part06Schedulers implements BaseTestObservables {
             }, "custom-thread").start();
         })
         .map(val -> {
-              log.info("Mapping..");
-              return val * 10;
+            int newValue = val * 10;
+            log.info("Mapping {} to {}", val, newValue);
+
+            return newValue;
         });
 
         observable.subscribe(logNext(), logError(), logComplete(latch));
         Helpers.wait(latch);
 
         log.info("Blocking Subscribe");
-//        observable.blockingSubscribe(logNext(), logError(), logComplete());
+        observable.blockingSubscribe(logNext(), logError(), logComplete());
         observable.observeOn(Schedulers.trampoline());
         log.info("Got");
     }
@@ -78,14 +100,16 @@ public class Part06Schedulers implements BaseTestObservables {
 
             subscriber.onComplete();
         });
-        observable = observable.subscribeOn(Schedulers.io()) //Specify execution on the IO Scheduler
+
+        observable = observable
+                .subscribeOn(Schedulers.io()) //Specify execution on the IO Scheduler
                 .map(val -> {
                     int newValue = val * 10;
-                    log.info("Mapping new val {}", newValue);
+                    log.info("Mapping {} to {}", val, newValue);
                     return newValue;
                 });
 
-        subscribeWithLogOutputWaiting(observable);
+        subscribeWithLogOutputWaitingForComplete(observable);
     }
 
 
@@ -108,7 +132,7 @@ public class Part06Schedulers implements BaseTestObservables {
                 })
                 .observeOn(Schedulers.newThread());
 
-        subscribeWithLogOutputWaiting(observable);
+        subscribeWithLogOutputWaitingForComplete(observable);
     }
 
     /**
@@ -128,7 +152,7 @@ public class Part06Schedulers implements BaseTestObservables {
                     return newValue;
                 });
 
-        subscribeWithLogOutputWaiting(observable);
+        subscribeWithLogOutputWaitingForComplete(observable);
     }
 
     /**
@@ -152,7 +176,7 @@ public class Part06Schedulers implements BaseTestObservables {
                                     .subscribeOn(Schedulers.from(fixedThreadPool))
                 );
 
-        subscribeWithLogOutputWaiting(observable);
+        subscribeWithLogOutputWaitingForComplete(observable);
     }
 
     private Flowable<String> simulateRemoteOp(Integer val) {

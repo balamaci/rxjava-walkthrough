@@ -167,7 +167,7 @@ public class Part09BackpressureHandling implements BaseTestObservables {
                     return "*" + val + "*";
                 });
 
-        subscribeWithLogOutputWaiting(flowable); //notice it's not the slowSubscribe method used
+        subscribeWithLogOutputWaitingForComplete(flowable); //notice it's not the slowSubscribe method used
     }
 
     /**

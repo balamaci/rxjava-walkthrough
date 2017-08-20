@@ -38,7 +38,7 @@ public class Part07FlatMapOperator implements BaseTestObservables {
         Flowable<String> colors = Flowable.just("orange", "red", "green")
                 .flatMap(colorName -> simulateRemoteOperation(colorName));
 
-        subscribeWithLogOutputWaiting(colors);
+        subscribeWithLogOutputWaitingForComplete(colors);
     }
 
     /**
@@ -60,7 +60,7 @@ public class Part07FlatMapOperator implements BaseTestObservables {
                     }
                 );
 
-        subscribeWithLogOutputWaiting(colorsCounted);
+        subscribeWithLogOutputWaitingForComplete(colorsCounted);
     }
 
 
@@ -75,7 +75,7 @@ public class Part07FlatMapOperator implements BaseTestObservables {
         Flowable<String> colors = Flowable.just("orange", "red", "green")
                 .flatMap(val -> simulateRemoteOperation(val), 1);
 
-        subscribeWithLogOutputWaiting(colors);
+        subscribeWithLogOutputWaitingForComplete(colors);
     }
 
     /**
@@ -91,7 +91,7 @@ public class Part07FlatMapOperator implements BaseTestObservables {
                 .subscribeOn(Schedulers.io())
                 .concatMap(val -> simulateRemoteOperation(val));
 
-        subscribeWithLogOutputWaiting(colors);
+        subscribeWithLogOutputWaitingForComplete(colors);
     }
 
     /**
@@ -114,7 +114,7 @@ public class Part07FlatMapOperator implements BaseTestObservables {
                                                                     .toFlowable()
                                         );
 
-        subscribeWithLogOutputWaiting(countedColors);
+        subscribeWithLogOutputWaitingForComplete(countedColors);
     }
 
     /**

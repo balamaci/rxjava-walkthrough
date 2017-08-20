@@ -39,9 +39,8 @@ public class Part03MergingStreams implements BaseTestObservables {
         }));
 
         Single<Pair<Boolean, Integer>> userCheckStream = Single.zip(isUserBlockedStream, userCreditScoreStream,
-                (blocked, creditScore) -> new Pair<>(blocked, creditScore));
-        subscribeWithLogOutputWaiting(userCheckStream);
-
+                (isBlocked, creditScore) -> new Pair<>(isBlocked, creditScore));
+        subscribeWithLogOutputWaitingForComplete(userCheckStream);
     }
 
     /**
@@ -56,7 +55,7 @@ public class Part03MergingStreams implements BaseTestObservables {
 
         Flowable<String> periodicEmitter = Flowable.zip(colors, timer, (key, val) -> key);
 
-        subscribeWithLogOutputWaiting(periodicEmitter);
+        subscribeWithLogOutputWaitingForComplete(periodicEmitter);
     }
 
 
@@ -77,7 +76,7 @@ public class Part03MergingStreams implements BaseTestObservables {
                 .take(5);
 
         Flowable flowable = Flowable.merge(colors, numbers);
-        subscribeWithLogOutputWaiting(flowable);
+        subscribeWithLogOutputWaitingForComplete(flowable);
     }
 
     /**
@@ -97,7 +96,7 @@ public class Part03MergingStreams implements BaseTestObservables {
                 .take(4);
 
         Flowable observable = Flowable.concat(colors, numbers);
-        subscribeWithLogOutputWaiting(observable);
+        subscribeWithLogOutputWaitingForComplete(observable);
     }
 
     /**
@@ -113,6 +112,6 @@ public class Part03MergingStreams implements BaseTestObservables {
                 .take(4);
         Flowable combinedFlowables = Flowable.combineLatest(colors, numbers, Pair::new);
 
-        subscribeWithLogOutputWaiting(combinedFlowables);
+        subscribeWithLogOutputWaitingForComplete(combinedFlowables);
     }
 }

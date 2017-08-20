@@ -205,7 +205,7 @@ public class Part08ErrorHandling implements BaseTestObservables {
                                                 .delay(2, TimeUnit.SECONDS)
                                           )
                                 .take(10);
-        subscribeWithLogOutputWaiting(remoteOperation);
+        subscribeWithLogOutputWaitingForComplete(remoteOperation);
     }
 
     private Flowable<String> simulateRemoteOperation(String color) {

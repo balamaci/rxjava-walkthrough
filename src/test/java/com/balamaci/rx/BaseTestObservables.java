@@ -50,7 +50,7 @@ public interface BaseTestObservables {
         );
     }
 
-    default <T> void subscribeWithLogOutputWaiting(Observable<T> observable) {
+    default <T> void subscribeWithLogOutputWaitingForComplete(Observable<T> observable) {
         CountDownLatch latch = new CountDownLatch(1);
 
         observable.subscribe(
@@ -69,7 +69,7 @@ public interface BaseTestObservables {
         );
     }
 
-    default <T> void subscribeWithLogOutputWaiting(Flowable<T> flowable) {
+    default <T> void subscribeWithLogOutputWaitingForComplete(Flowable<T> flowable) {
         CountDownLatch latch = new CountDownLatch(1);
 
         flowable.subscribe(
@@ -81,7 +81,7 @@ public interface BaseTestObservables {
         Helpers.wait(latch);
     }
 
-    default <T> void subscribeWithLogOutputWaiting(Single<T> single) {
+    default <T> void subscribeWithLogOutputWaitingForComplete(Single<T> single) {
         CountDownLatch latch = new CountDownLatch(1);
 
         single.subscribe(
