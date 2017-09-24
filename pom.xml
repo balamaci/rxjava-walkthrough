@@ -11,8 +11,7 @@
     <description>RxJava Playground - Test scenarios describing RxJava functionality</description>
 
     <properties>
-        <rxjava.version>2.1.2</rxjava.version>
-        <spring.version>4.2.5.RELEASE</spring.version>
+        <rxjava.version>2.1.4</rxjava.version>
         <slf4j.version>1.7.25</slf4j.version>
     </properties>
 

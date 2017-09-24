@@ -1086,8 +1086,8 @@ Observable<Pair<String, Integer>> colorsCounted = colors
 Code at [Part08ErrorHandling.java](https://github.com/balamaci/rxjava-playground/blob/master/src/test/java/com/balamaci/rx/Part08ErrorHandling.java)
 
 Exceptions are for exceptional situations.
-The Observable contract specifies that exceptions are terminal operations. 
-That means in case an error reaches the Subscriber, after invoking the 'onError' handler, it also unsubscribes:
+The Reactive Streams specification says that **exceptions are terminal operations**. 
+That means in case an error occurs, it triggers an unsubscription upstream and the error travels downstream to the Subscriber, invoking the 'onError' handler:
 
 ```java
 Observable<String> colors = Observable.just("green", "blue", "red", "yellow")
@@ -1113,7 +1113,7 @@ returns:
 23:30:17 [main] ERROR - Subscriber received error 'Encountered red'
 ```
 After the map() operator encounters an error it unsubscribes(cancels the subscription) from upstream 
-- therefore 'yellow' is not even emitted-. The error travels downstream and triggers the error handler in the subscriber.
+- therefore 'yellow' is not even emitted-. The error travels downstream and triggers the error handler in the Subscriber.
 
 
 There are operators to deal with error flow control:
@@ -1124,18 +1124,21 @@ The 'onErrorReturn' operator replaces an exception with a value:
 
 ```java
 Flowable<Integer> numbers = Flowable.just("1", "3", "a", "4", "5", "c")
+                            .doOnCancel(() -> log.info("Subscription canceled"))
                             .map(Integer::parseInt) 
                             .onErrorReturn(0);      
 subscribeWithLog(numbers);
-=====
+
+======================
 Subscriber received: 1
 Subscriber received: 3
+Subscription canceled
 Subscriber received: 0
 Subscriber got Completed event
 ```
 
 Notice though how it didn't prevent map() operator from unsubscribing from the Flowable, but it did 
-trigger the normal onNext callback instead of onError in the subscriber.
+trigger the normal **onNext** callback instead of **onError** in the subscriber.
 
 
 Let's introduce a more realcase scenario of a simulated remote request that might fail 
