@@ -1080,7 +1080,22 @@ Observable<Pair<String, Integer>> colorsCounted = colors
     );
 ```
 
+We can also use **switchIfEmpty** to provide some values when the original Publisher doesn't return anything, just completes.
+```java
+Flowable<String> colors = Flowable.just("red", "", "blue")
+                            .flatMap(colorName -> simulateRemoteOperation(colorName)
+                                                    .switchIfEmpty(Flowable.just("NONE")));
 
+13:11:02  Subscriber received: red0
+13:11:02  Subscriber received: red1
+13:11:02  Subscriber received: red2
+13:11:03  Subscriber received: NONE
+13:11:03  Subscriber received: blue0
+13:11:03  Subscriber received: blue1
+13:11:03  Subscriber received: blue2
+13:11:03  Subscriber received: blue3
+13:11:03  Subscriber got Completed event
+```
 
 ## Error handling
 Code at [Part08ErrorHandling.java](https://github.com/balamaci/rxjava-playground/blob/master/src/test/java/com/balamaci/rx/Part08ErrorHandling.java)
@@ -1112,8 +1127,8 @@ returns:
 23:30:17 [main] INFO - Subscriber received: blue*XXX
 23:30:17 [main] ERROR - Subscriber received error 'Encountered red'
 ```
-After the map() operator encounters an error it unsubscribes(cancels the subscription) from upstream 
-- therefore 'yellow' is not even emitted-. The error travels downstream and triggers the error handler in the Subscriber.
+After the map() operator encounters an error it unsubscribes(cancels the subscription) from upstream
+(therefore 'yellow' is not even emitted). The error travels downstream and triggers the error handler in the Subscriber.
 
 
 There are operators to deal with error flow control:
@@ -1137,11 +1152,13 @@ Subscriber received: 0
 Subscriber got Completed event
 ```
 
-Notice though how it didn't prevent map() operator from unsubscribing from the Flowable, but it did 
+Notice though how **it didn't prevent map() operator from unsubscribing from the Flowable**, but it did 
 trigger the normal **onNext** callback instead of **onError** in the subscriber.
 
 
-Let's introduce a more realcase scenario of a simulated remote request that might fail 
+Let's introduce a more realcase scenario of a simulated remote request that fails whenever it's invoked
+with "red" and "black" color parameters otherwise just add some \*s.
+
 
 ```java
 private Observable<String> simulateRemoteOperation(String color) {
@@ -1209,7 +1226,7 @@ returns:
 
 ### onErrorResumeNext
 onErrorResumeNext() returns a stream instead of an exception, useful for example to invoke a fallback 
-method that returns also a stream
+method that returns an alternate Stream
 
 ```java
 Observable<String> colors = Observable.just("green", "blue", "red", "white", "blue")
@@ -1226,6 +1243,8 @@ private Observable<String> fallbackRemoteOperation() {
         return Observable.just("blank");
 }
 ```
+
+
 
 ## Retrying
 

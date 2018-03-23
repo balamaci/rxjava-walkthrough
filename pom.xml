@@ -11,7 +11,7 @@
     <description>RxJava Playground - Test scenarios describing RxJava functionality</description>
 
     <properties>
-        <rxjava.version>2.1.4</rxjava.version>
+        <rxjava.version>2.1.11</rxjava.version>
         <slf4j.version>1.7.25</slf4j.version>
     </properties>
 
@@ -21,12 +21,6 @@
             <groupId>io.reactivex.rxjava2</groupId>
             <artifactId>rxjava</artifactId>
             <version>${rxjava.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>io.javaslang</groupId>
-            <artifactId>javaslang</artifactId>
-            <version>2.0.2</version>
         </dependency>
 
         <!-- Logging -->

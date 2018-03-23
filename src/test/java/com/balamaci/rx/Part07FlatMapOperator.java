@@ -73,7 +73,7 @@ public class Part07FlatMapOperator implements BaseTestObservables {
     @Test
     public void flatMapConcurrency() {
         Flowable<String> colors = Flowable.just("orange", "red", "green")
-                .flatMap(val -> simulateRemoteOperation(val), 1);
+                .flatMap(colorName -> simulateRemoteOperation(colorName), 1);
 
         subscribeWithLogOutputWaitingForComplete(colors);
     }
@@ -115,6 +115,18 @@ public class Part07FlatMapOperator implements BaseTestObservables {
                                         );
 
         subscribeWithLogOutputWaitingForComplete(countedColors);
+    }
+
+    /**
+     * 'switchIfEmpty' push some value(s) when the original stream just completes without 'returning' anything
+     */
+    @Test
+    public void flatMapSubstituteEmptyStream() {
+        Flowable<String> colors = Flowable.just("red", "", "blue")
+                .flatMap(colorName -> simulateRemoteOperation(colorName)
+                                        .switchIfEmpty(Flowable.just("NONE")));
+
+        subscribeWithLogOutputWaitingForComplete(colors);
     }
 
     /**

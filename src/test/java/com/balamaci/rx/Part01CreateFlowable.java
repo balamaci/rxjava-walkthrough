@@ -6,9 +6,9 @@ import io.reactivex.Flowable;
 import io.reactivex.Observable;
 import io.reactivex.Single;
 import io.reactivex.disposables.Disposable;
-import javaslang.collection.List;
 import org.junit.Test;
 
+import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -45,7 +45,7 @@ public class Part01CreateFlowable implements BaseTestObservables {
 
     @Test
     public void fromIterable() {
-        Flowable<String> flowable = Flowable.fromIterable(List.of("red", "green", "blue"));
+        Flowable<String> flowable = Flowable.fromIterable(Arrays.asList("red", "green", "blue"));
 
         flowable.subscribe(
                 val -> log.info("Subscriber received: {}"));
