@@ -956,8 +956,30 @@ Observable<Integer> observable =
 ```
 
 ### back to blocking world 
-How about when we want to switch back to a blocking. We saw above how we need to , switching from legacy code
-might 
+How about when we want to switch back to a blocking flow. We saw above how we need to explicitly use latching
+to keep the [main] thread. Say we're incrementally switching from legacy code and we have a Service method
+*Collection\<String\> findUsers()* inside this method we can still be reactive but to the caller of the method we
+still need to block until we get all the elements of the Collection.
+
+```java
+log.info("Starting");
+
+Flowable<String> flowable = simpleFlowable()
+                .subscribeOn(Schedulers.io())
+                .subscribeOn(Schedulers.computation())
+                .map(val -> {
+                    String newValue = "^^" + val + "^^";
+                    log.info("Mapping new val {}", newValue);
+                    return newValue;
+                });
+
+Iterable<String> iterable = flowable.blockingIterable(); //this call will block until
+//the
+iterable.forEach(val -> log.info("Received {}", val));
+
+==========================
+```
+
 
 
 

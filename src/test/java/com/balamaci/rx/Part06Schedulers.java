@@ -47,13 +47,13 @@ public class Part06Schedulers implements BaseTestObservables {
 
             subscriber.onComplete();
         })
-        .map(val -> {
-            int newValue = val * 10;
-            log.info("Mapping {} to {}", val, newValue);
+                .map(val -> {
+                    int newValue = val * 10;
+                    log.info("Mapping {} to {}", val, newValue);
 //            Helpers.sleepMillis(2000);
-            return newValue;
-        })
-        .subscribe(logNext());
+                    return newValue;
+                })
+                .subscribe(logNext());
     }
 
     @Test
@@ -68,12 +68,12 @@ public class Part06Schedulers implements BaseTestObservables {
                 subscriber.onComplete();
             }, "custom-thread").start();
         })
-        .map(val -> {
-            int newValue = val * 10;
-            log.info("Mapping {} to {}", val, newValue);
+                .map(val -> {
+                    int newValue = val * 10;
+                    log.info("Mapping {} to {}", val, newValue);
 
-            return newValue;
-        });
+                    return newValue;
+                });
 
         observable.subscribe(logNext(), logError(), logComplete(latch));
         Helpers.wait(latch);
@@ -153,6 +153,26 @@ public class Part06Schedulers implements BaseTestObservables {
                 });
 
         subscribeWithLogOutputWaitingForComplete(observable);
+    }
+
+    @Test
+    public void blocking() {
+        log.info("Starting");
+
+        Flowable<String> flowable = simpleFlowable()
+                .subscribeOn(Schedulers.io())
+                .subscribeOn(Schedulers.computation())
+                .map(val -> {
+                    String newValue = "^^" + val + "^^";
+                    log.info("Mapping new val {}", newValue);
+                    Helpers.sleepMillis(100);
+                    return newValue;
+                });
+        flowable.blockingSubscribe(val -> log.info("Subscriber received {}", val));
+        log.info("Finished blocking subscribe");
+
+        Iterable<String> iterable = flowable.blockingIterable();
+        iterable.forEach(val -> log.info("Received {}", val));
     }
 
     /**
