@@ -958,8 +958,10 @@ Observable<Integer> observable =
 ### back to blocking world 
 How about when we want to switch back to a blocking flow. We saw above how we need to explicitly use latching
 to keep the [main] thread. Say we're incrementally switching from legacy code and we have a Service method
-*Collection\<String\> findUsers()* inside this method we can still be reactive but to the caller of the method we
+**Collection\<String\> findUsers()** inside this method we can still be reactive but to the caller of the method we
 still need to block until we get all the elements of the Collection.
+Using **blockingIterable** will block our Test thread till the Flow completes, waiting
+for the events to be emitted(we're sleeping just to show it's not completing by chance).
 
 ```java
 log.info("Starting");
@@ -970,17 +972,30 @@ Flowable<String> flowable = simpleFlowable()
                 .map(val -> {
                     String newValue = "^^" + val + "^^";
                     log.info("Mapping new val {}", newValue);
+                    Helpers.sleepMillis(500);
                     return newValue;
                 });
 
 Iterable<String> iterable = flowable.blockingIterable(); //this call will block until
-//the
+//the stream completes
 iterable.forEach(val -> log.info("Received {}", val));
 
 ==========================
+17:48:13 [RxCachedThreadScheduler-1] - Started emitting
+17:48:13 [RxCachedThreadScheduler-1] - Emitting 1st
+17:48:13 [RxCachedThreadScheduler-1] - Mapping new val ^^1^^
+17:48:14 [RxCachedThreadScheduler-1] - Emitting 2nd
+17:48:14 [main] - Received ^^1^^
+17:48:14 [RxCachedThreadScheduler-1] - Mapping new val ^^2^^
+17:48:14 [main] - Received ^^2^^
+17:48:14 [main] - Finished blockingIterable
 ```
+we can see the events being received back on the **\[main\]** thread.
 
-
+```java
+    //block until the stream completes or throws an error.
+    flowable.blockingSubscribe(val -> log.info("Subscriber received {}", val));
+```
 
 
 ## Flatmap operator
@@ -1117,6 +1132,19 @@ Flowable<String> colors = Flowable.just("red", "", "blue")
 13:11:03  Subscriber received: blue2
 13:11:03  Subscriber received: blue3
 13:11:03  Subscriber got Completed event
+```
+
+**flatMapIterable** is just an easy way to pass each of the elements of a collection
+as a stream
+```
+Flowable<String> colors = Flowable.just(1)
+                .flatMapIterable(it -> generateColors());
+
+
+private List<String> generateColors() {
+   return Arrays.asList("red", "green", "blue");
+}
+
 ```
 
 ## Error handling

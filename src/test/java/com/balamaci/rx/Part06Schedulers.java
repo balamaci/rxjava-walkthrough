@@ -165,7 +165,7 @@ public class Part06Schedulers implements BaseTestObservables {
                 .map(val -> {
                     String newValue = "^^" + val + "^^";
                     log.info("Mapping new val {}", newValue);
-                    Helpers.sleepMillis(100);
+                    Helpers.sleepMillis(500);
                     return newValue;
                 });
         flowable.blockingSubscribe(val -> log.info("Subscriber received {}", val));
@@ -173,6 +173,7 @@ public class Part06Schedulers implements BaseTestObservables {
 
         Iterable<String> iterable = flowable.blockingIterable();
         iterable.forEach(val -> log.info("Received {}", val));
+        log.info("Finished blockingIterable");
     }
 
     /**

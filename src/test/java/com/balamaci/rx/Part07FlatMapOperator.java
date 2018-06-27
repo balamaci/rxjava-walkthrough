@@ -8,6 +8,8 @@ import io.reactivex.schedulers.Schedulers;
 import javafx.util.Pair;
 import org.junit.Test;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -127,6 +129,22 @@ public class Part07FlatMapOperator implements BaseTestObservables {
                                         .switchIfEmpty(Flowable.just("NONE")));
 
         subscribeWithLogOutputWaitingForComplete(colors);
+    }
+
+    /**
+     * flatMapIterable just takes as List and emits each of the elements
+     * as a stream.
+     */
+    @Test
+    public void flatMapIterable() {
+        Flowable<String> colors = Flowable.just(1)
+                .flatMapIterable(it -> generateColors());
+
+        subscribeWithLogOutputWaitingForComplete(colors);
+    }
+
+    private List<String> generateColors() {
+        return Arrays.asList("red", "green", "blue");
     }
 
     /**
