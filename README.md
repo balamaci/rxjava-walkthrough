@@ -1141,6 +1141,38 @@ private List<String> generateColors() {
 
 ```
 
+**switchMap** operator also prevents inter-leavings as only one of stream is subscribed at a time, 
+but this is controlled from upstream. If a new value comes from upstream, the current subscribed inner-stream 
+ gets canceled and a new subscription is made for the new value.
+The current stream will remain subscribed as long as there are no new values from upstream. 
+```java   
+Flowable<String> colors = Flowable.interval(0,400, TimeUnit.MILLISECONDS)
+         .zipWith(Arrays.asList("EUR", "USD", "GBP"), (it, currency) -> currency)
+         .doOnNext(ev -> log.info("Emitting {}", ev))
+         .switchMap(currency -> simulateRemoteOperation(currency)
+                      .doOnSubscribe((subscription) -> log.info("Subscribed new"))
+                      .doOnCancel(() -> log.info("Unsubscribed {}", currency))
+         );
+```
+
+17:45:16 [RxComputationThreadPool-1] INFO BaseTestObservables - Emitting EUR
+17:45:16 [RxComputationThreadPool-1] INFO BaseTestObservables - Subscribed new
+17:45:16 [RxComputationThreadPool-2] INFO BaseTestObservables - Subscriber received: EUR1
+17:45:16 [RxComputationThreadPool-2] INFO BaseTestObservables - Subscriber received: EUR2
+17:45:16 [RxComputationThreadPool-1] INFO BaseTestObservables - Emitting USD
+17:45:16 [RxComputationThreadPool-1] INFO BaseTestObservables - Unsubscribed EUR
+17:45:16 [RxComputationThreadPool-1] INFO BaseTestObservables - Subscribed new
+17:45:16 [RxComputationThreadPool-3] INFO BaseTestObservables - Subscriber received: USD1
+17:45:16 [RxComputationThreadPool-3] INFO BaseTestObservables - Subscriber received: USD2
+17:45:17 [RxComputationThreadPool-1] INFO BaseTestObservables - Emitting GBP
+17:45:17 [RxComputationThreadPool-1] INFO BaseTestObservables - Unsubscribed USD
+17:45:17 [RxComputationThreadPool-1] INFO BaseTestObservables - Subscribed new
+17:45:17 [RxComputationThreadPool-3] INFO BaseTestObservables - Subscriber received: USD3
+17:45:17 [RxComputationThreadPool-4] INFO BaseTestObservables - Subscriber received: GBP1
+17:45:17 [RxComputationThreadPool-4] INFO BaseTestObservables - Subscriber received: GBP2
+17:45:17 [RxComputationThreadPool-4] INFO BaseTestObservables - Subscriber received: GBP3
+17:45:17 [RxComputationThreadPool-4] INFO BaseTestObservables - Subscriber got Completed event
+
 ## Error handling
 Code at [Part08ErrorHandling.java](https://github.com/balamaci/rxjava-playground/blob/master/src/test/java/com/balamaci/rx/Part08ErrorHandling.java)
 

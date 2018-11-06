@@ -149,10 +149,12 @@ public class Part07FlatMapOperator implements BaseTestObservables {
 
     @Test
     public void switchMap() {
-        Flowable<String> colors = Flowable.interval(400, TimeUnit.MILLISECONDS)
-                .zipWith(Arrays.asList("red", "green", "blue"), (it, color) -> color)
-                .switchMap(color -> simulateRemoteOperation(color)
-                        .doOnCancel(() -> log.info("Unsubscribed {}", color))
+        Flowable<String> colors = Flowable.interval(0,400, TimeUnit.MILLISECONDS)
+                .zipWith(Arrays.asList("EUR", "USD", "GBP"), (it, currency) -> currency)
+                .doOnNext(ev -> log.info("Emitting {}", ev))
+                .switchMap(currency -> simulateRemoteOperation(currency)
+                        .doOnSubscribe((subscription) -> log.info("Subscribed new"))
+                        .doOnCancel(() -> log.info("Unsubscribed {}", currency))
                 );
 
         subscribeWithLogOutputWaitingForComplete(colors);
