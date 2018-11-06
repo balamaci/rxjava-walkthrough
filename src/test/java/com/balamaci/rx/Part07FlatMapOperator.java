@@ -1,7 +1,5 @@
 package com.balamaci.rx;
 
-import com.balamaci.rx.util.Helpers;
-import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.flowables.GroupedFlowable;
 import io.reactivex.schedulers.Schedulers;
@@ -91,7 +89,9 @@ public class Part07FlatMapOperator implements BaseTestObservables {
     public void concatMap() {
         Flowable<String> colors = Flowable.just("orange", "red", "green", "blue")
                 .subscribeOn(Schedulers.io())
-                .concatMap(val -> simulateRemoteOperation(val));
+                .concatMap(val -> simulateRemoteOperation(val)
+                        .subscribeOn(Schedulers.io())
+                );
 
         subscribeWithLogOutputWaitingForComplete(colors);
     }
@@ -147,20 +147,26 @@ public class Part07FlatMapOperator implements BaseTestObservables {
         return Arrays.asList("red", "green", "blue");
     }
 
+    @Test
+    public void switchMap() {
+        Flowable<String> colors = Flowable.interval(400, TimeUnit.MILLISECONDS)
+                .zipWith(Arrays.asList("red", "green", "blue"), (it, color) -> color)
+                .switchMap(color -> simulateRemoteOperation(color)
+                        .doOnCancel(() -> log.info("Unsubscribed {}", color))
+                );
+
+        subscribeWithLogOutputWaitingForComplete(colors);
+    }
+
+
     /**
      * Simulated remote operation that emits as many events as the length of the color string
      * @param color color
      * @return stream of events
      */
     private Flowable<String> simulateRemoteOperation(String color) {
-        return Flowable.<String>create(subscriber -> {
-            for (int i = 0; i < color.length(); i++) {
-                subscriber.onNext(color + i);
-                Helpers.sleepMillis(200);
-            }
-
-            subscriber.onComplete();
-        }, BackpressureStrategy.MISSING);
+        return Flowable.intervalRange(1, color.length(), 0, 200, TimeUnit.MILLISECONDS)
+                .map(iteration -> color + iteration);
     }
 
 }

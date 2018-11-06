@@ -1025,15 +1025,9 @@ so for example **red : red0, red1, red2**
 
 ```java
 private Flowable<String> simulateRemoteOperation(String color) {
-        return Flowable.<String>create(subscriber -> {
-            for (int i = 0; i < color.length(); i++) {
-                subscriber.onNext(color + i);
-                Helpers.sleepMillis(200);
-            }
-
-            subscriber.onComplete();
-        }, BackpressureStrategy.MISSING);
-    }
+  return Flowable.intervalRange(1, color.length(), 0, 200, TimeUnit.MILLISECONDS)
+             .map(iteration -> color + iteration);
+}
 ```
 
 If we have a stream of color names:
