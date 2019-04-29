@@ -1,9 +1,9 @@
 package com.balamaci.rx;
 
 import com.balamaci.rx.util.Helpers;
+import com.balamaci.rx.util.Pair;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
-import javafx.util.Pair;
 import org.junit.Test;
 
 import java.util.concurrent.CompletableFuture;
@@ -39,7 +39,7 @@ public class Part03MergingStreams implements BaseTestObservables {
         }));
 
         Single<Pair<Boolean, Integer>> userCheckStream = Single.zip(isUserBlockedStream, userCreditScoreStream,
-                (isBlocked, creditScore) -> new Pair<>(isBlocked, creditScore));
+                Pair::new);
         subscribeWithLogOutputWaitingForComplete(userCheckStream);
     }
 
