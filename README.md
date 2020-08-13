@@ -84,7 +84,7 @@ CompletableFuture<String> completableFuture = CompletableFuture
                     return "red";
             });
 
-Single<String> observable = Single.from(completableFuture);
+Single<String> single = Single.from(completableFuture);
 single.subscribe(val -> log.info("Stream completed successfully : {}", val));
 ```
 
